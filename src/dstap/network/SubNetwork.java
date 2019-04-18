@@ -26,9 +26,11 @@ import java.util.Set;
  * @author vp6258
  */
 public class SubNetwork extends Network {
-    private MasterNetwork masterNet;
+    private final MasterNetwork masterNet;
     
-    private Set<Node> originsInMasterNet;
+    //each subnetwork has an origin in master net if there is a demand from that origin to dest in another subnet.
+    //the following variable stores those origins so we can easily access those for updating a-link parameters
+    private Set<Node> originsInMasterNet; 
     private Set<Node> destsInMasterNet;
     public Set<Node> originsInThisSubnetDueToOtherSubnet;
     public Set<Node> destInThisSubnetDueToOtherSubnet;
@@ -37,6 +39,7 @@ public class SubNetwork extends Network {
     private Set<Node> boundaryNodes;//the boundary nodes for this subnet
     private Set<ExtraNode> extraNodes; //other subnetwork boundary nodes modeled as extra nodes
     
+    protected Set<ArtificialLink> artificialLinks;
     private Set<ExtraNodeLink> extraNodeLinks;
     
     private Set<ArtificialODPair> artificialODs;
@@ -51,6 +54,7 @@ public class SubNetwork extends Network {
         boundaryNodes = new HashSet<>();
         extraNodes = new HashSet<>();
         extraNodeLinks = new HashSet<>();
+        artificialLinks = new HashSet<>();
         artificialODs = new HashSet<>();
         artificialODsByOrigin = new HashMap<>();
         
@@ -246,7 +250,7 @@ public class SubNetwork extends Network {
      * these are OD pairs created in THIS subnetwork where the endpoints are in the other subnet
      * We call these "EXTRA" nodes
      * origin artificial nodes have 10000 added to them and destinations have 20000 added to them
-     * here we create the nodes in this subnetwork (artificial nodes) and the associated OD pair
+     * here we create the nodes in this subnetwork (extra nodes) and the associated artificial OD pair
      * @param origin_id
      * @param dest_id
      * @param demand
@@ -255,22 +259,25 @@ public class SubNetwork extends Network {
         Node origin =null, dest = null;
         if (!nodesByID.containsKey(origin_id+10000))
         {
-            nodesByID.put(origin_id+10000, new ExtraNode(origin_id+10000, networkName));
+            ExtraNode n = new ExtraNode(origin_id+10000, networkName);
+            nodesByID.put(origin_id+10000, n);
+            extraNodes.add(n);
         }
 
         if (!nodesByID.containsKey(dest_id+20000))
         {
-            nodesByID.put(dest_id+20000, new ExtraNode(dest_id+20000, networkName));
+            ExtraNode n = new ExtraNode(dest_id+20000, networkName);
+            nodesByID.put(dest_id+20000, n);
+            extraNodes.add(n);
         }
         origin = nodesByID.get(origin_id+10000);
         dest = nodesByID.get(dest_id+20000);
 
-        //Create zero cost link from each of origin and destination
+        //Create a copy of masternetLink called ExtraNode link from each of origin and destination
         generateExtraNodeLinkForEquivalentRegionalLink(origin, dest);
         
-        if (demand > 0){
-            tripTable.addODpair(origin, dest, demand);
-        }
+        tripTable.addODpair(origin, dest, demand); //this is a regular OD pair because artificialODpairs can only parallel an artificial link
+        
         if(!originsInThisSubnetDueToOtherSubnet.contains(origin))
             originsInThisSubnetDueToOtherSubnet.add(origin);
         if(!destInThisSubnetDueToOtherSubnet.contains(dest))
@@ -352,20 +359,22 @@ public class SubNetwork extends Network {
         }
     }
     
+    //for origins in master network, connect that origin to all boundary nodes reachable by the origin
+    
     public void createMasterNetArtificialLinksAndItsODPair(){
+        //OD pair and artificial link from origin to boundary nodes
         for (Node origin : originsInMasterNet){
             ///see which boundary nodes are accessible from this origin/
             dijkstras(origin);
             for (Node dest : boundaryNodes){
                 if (dest.label < Double.MAX_VALUE && dest.getId()!=origin.getId()){
                     //dest node is accessible from origin
-                    if(tripTable.getTrips().containsKey(origin)){
-                        if (!tripTable.getTrips().get(origin).containsKey(dest)){
-                            tripTable.addArtificialODPair(origin, dest, 0);
-                        }
-                    }
-                    else
-                        tripTable.addArtificialODPair(origin, dest, 0);
+//                    if(tripTable.getOrigins().contains(origin)){
+//                        if(!tripTable.getTrips().get(origin).containsKey(dest))
+//                            tripTable.addArtificialODPair(origin, dest, 0.0);
+//                    }
+//                    else
+                    tripTable.addArtificialODPair(origin, dest, 0.0);
                     ArtificialODPair subNetODPair = tripTable.getArtificialODPair(origin, dest);
 
                     /*
@@ -381,21 +390,18 @@ public class SubNetwork extends Network {
                 }
             }
         }
-        /*
-        OD pair and artificial link from boundary to dest
-         */
+        //OD pair and artificial link from boundary to dest
         for (Node origin : boundaryNodes){
             dijkstras(origin);
             for (Node dest : destsInMasterNet){
                 if (dest.label < Double.MAX_VALUE && dest.getId()!=origin.getId()){
                     //dest node accessible from origin
-                    if(tripTable.getTrips().containsKey(origin)){
-                        if (!tripTable.getTrips().get(origin).containsKey(dest)){
-                            tripTable.addArtificialODPair(origin, dest, 0);
-                        }
-                    }
-                    else
-                        tripTable.addArtificialODPair(origin, dest, 0);
+//                    if(tripTable.getOrigins().contains(origin)){
+//                        if(!tripTable.getTrips().get(origin).containsKey(dest))
+//                            tripTable.addArtificialODPair(origin, dest, 0.0);
+//                    }
+//                    else
+                    tripTable.addArtificialODPair(origin, dest, 0);
                     //tripTable.addODpair(origin, dest, 0);
                     ArtificialODPair subNetODPair = tripTable.getArtificialODPair(origin, dest);
 
@@ -417,20 +423,17 @@ public class SubNetwork extends Network {
             for(Node dest: destInThisSubnetDueToOtherSubnet){
                 if (dest.label < Double.MAX_VALUE && dest.getId()!=origin.getId()){
                     if(origin.getId()-10000 == dest.getId()-20000)
-                        continue;
-                    
-                    if(tripTable.getTrips().containsKey(origin)){
-                        if (!tripTable.getTrips().get(origin).containsKey(dest)){
-                            tripTable.addArtificialODPair(origin, dest, 0);
-                        }
-                    }
-                    else
-                        tripTable.addArtificialODPair(origin, dest, 0);
+                        continue; //same nodes so skip creating any OD pair or so
+//                    if(tripTable.getOrigins().contains(origin)){
+//                        if(!tripTable.getTrips().get(origin).containsKey(dest))
+//                            tripTable.addArtificialODPair(origin, dest, 0.0);
+//                    }
+//                    else
+                    tripTable.addArtificialODPair(origin, dest, 0);
                     ArtificialODPair subNetODPair = tripTable.getArtificialODPair(origin, dest);
 
-                    /*
-                       create the link in other subnetwork
-                    */
+                    //create the link in other subnetwork
+                    //@todo: handle more than two partitions for creating subnetwork artificial links
                     if(otherSubNet.size()>1){
                         System.out.println("More than two partitions cannot be handled for now");
                         System.exit(1);
@@ -487,12 +490,44 @@ public class SubNetwork extends Network {
                     fftime, coef, power, cap, networkName));
 
         l.setAssociatedODPair(subNetODPair);
+        this.artificialLinks.add(l);
         return l;
+    }
+    
+    public void printSubNetworkStatistics(){
+        printNetworkStatistics();
+        System.out.println(" Boundary Nodes = "+boundaryNodes);
+        System.out.println(" Extra Nodes = " + extraNodes);
+        System.out.println(" Extra Node Links = "+ extraNodeLinks);
+        System.out.println(" Artificial Links = "+artificialLinks);
+        System.out.println(" Origins in Master Net = "+originsInMasterNet);
+        System.out.println(" Dests in Master Net="+destsInMasterNet);
+        System.out.println(" Origins in this subnetwork due to other subnetworks = "+originsInThisSubnetDueToOtherSubnet);
+        System.out.println(" Dests in this subnetwork due to other subnetworks = "+destInThisSubnetDueToOtherSubnet);
+        
+        int artifiODPairsNumber =0;
+        System.out.println("Artificial OD pairs");
+        for(Node origin: tripTable.getOrigins()){
+            for(ODPair od: tripTable.byOrigin(origin)){
+                if(od instanceof ArtificialODPair){
+                    System.out.print("\t"+od);
+                    artifiODPairsNumber++;
+                }
+            }
+        }
+        System.out.println("");
+        System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
+        
     }
 
 
     public Set<Node> getBoundaryNodes() {
         return boundaryNodes;
+    }
+
+    @Override
+    public String toString() {
+        return "" + this.networkName;
     }
     
     

@@ -45,10 +45,10 @@ public class TripTable implements Iterable<ODPair> {
     
     public ArtificialODPair getArtificialODPair(Node origin, Node dest){
         if(!artificialODPairs.containsKey(origin)){
-            System.out.println("Triptable: origin was nor found\t"+origin);
+            System.out.println("Triptable: origin was not found\t"+origin);
             System.exit(1);
         } else if (!artificialODPairs.get(origin).containsKey(dest)){
-            System.out.println("Triptable: dest was nor found\t"+origin);
+            System.out.println("Triptable: dest was not found\t"+origin);
             System.exit(1);
         }
         return artificialODPairs.get(origin).get(dest);
@@ -63,7 +63,11 @@ public class TripTable implements Iterable<ODPair> {
         else{
             odPairs.put(o, temp = new HashMap<>());
         }
-        temp.put(d, new ODPair(o, d));
+        if(temp.containsKey(d)){
+            temp.get(d).addToDemand(0.0); //we already have this OD pair defined, so simply add that demand to original demand
+        }
+        else
+            temp.put(d, new ODPair(o, d));
     }
 
     public void addODpair(Node o, Node d, double demand){
@@ -74,7 +78,12 @@ public class TripTable implements Iterable<ODPair> {
         else{
             odPairs.put(o, temp = new HashMap<>());
         }
-        temp.put(d, new ODPair(o, d, demand));
+        
+        if(temp.containsKey(d)){
+            temp.get(d).addToDemand(demand); //we already have this OD pair defined, so simply add that demand to original demand
+        }
+        else
+            temp.put(d, new ODPair(o, d, demand));
         if (!origins.contains(o)){
             origins.add(o);
         }
@@ -93,7 +102,11 @@ public class TripTable implements Iterable<ODPair> {
         else{
             odPairs.put(o, temp = new HashMap<>());
         }
-        temp.put(d, new ODPair(o, d, demand, netName));
+        if(temp.containsKey(d)){
+            temp.get(d).addToDemand(demand); //we already have this OD pair defined, so simply add that demand to original demand
+        }
+        else
+            temp.put(d, new ODPair(o, d, demand, netName));
         if (!origins.contains(o)){
             origins.add(o);
         }
@@ -102,7 +115,18 @@ public class TripTable implements Iterable<ODPair> {
         }
     }
     
+    //every OD pair is of
     public void addArtificialODPair(Node o, Node d, double demand){
+        //check if there already exists an ODpair object between o and d
+        if(odPairs.containsKey(o)){
+            if(odPairs.get(o).containsKey(d)){
+                demand = demand + odPairs.get(o).get(d).getDemand();
+                odPairs.get(o).put(d, null);
+            }
+        }
+        
+        
+        ArtificialODPair od= null;
         Map<Node, ArtificialODPair> temp;
         if(artificialODPairs.containsKey(o)){
             temp = artificialODPairs.get(o);
@@ -110,14 +134,24 @@ public class TripTable implements Iterable<ODPair> {
         else{
             artificialODPairs.put(o, temp = new HashMap<>());
         }
-        temp.put(d, new ArtificialODPair(o, d, demand));
-        addODpair(o, d, demand); //ODpair contains all artificials as well
+        temp.put(d, od=new ArtificialODPair(o, d, demand));
+        
+        Map<Node, ODPair> temp2;
+        if(odPairs.containsKey(o)){
+            temp2 = odPairs.get(o);
+        }
+        else{
+            odPairs.put(o, temp2 = new HashMap<>());
+        }
+        temp2.put(d, (ODPair) od);
         if (!origins.contains(o)){
             origins.add(o);
         }
         if (!dests.contains(d)){
             dests.add(d);
         }
+        
+//        addODpair(o, d, demand); //ODpair contains all artificials as well
     }
 
     public void addOrigin(Node o){
@@ -163,12 +197,16 @@ public class TripTable implements Iterable<ODPair> {
     public Iterable<ODPair> byOrigin(Node origin){
         return new MapValueIterable<>(odPairs.get(origin));
     }
+    
+//    public Iterable<ODPair> byOriginArtificial(Node origin){
+//        return new MapValueIterable<>(artificialODPairs.get(origin));
+//    }
 
     @Override
     public Iterator<ODPair> iterator(){
         return new TripTableIterator();
     }
-
+    
     class TripTableIterator implements Iterator<ODPair>{
         private Iterator<ODPair> inner;  // iterates over destinations of each origin and returns the associated ODpair object
         private final Iterator<Node> outer;  // iterates over origins
@@ -177,6 +215,7 @@ public class TripTable implements Iterable<ODPair> {
             outer = odPairs.keySet().iterator();
             inner = new MapValueIterator<>(odPairs.get(outer.next()));
         }
+        
         @Override
         public boolean hasNext(){
             return inner.hasNext() || outer.hasNext();

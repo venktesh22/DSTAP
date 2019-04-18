@@ -14,28 +14,24 @@ import java.util.List;
 import java.util.Scanner;
 
 /**
- * This modified version of Ehsan's code provides a neater organization of files, variables, and inputs
- * It offers two options:
+ * This modified version of Ehsan's code provides a different organization of files, variables, and inputs
+ * It is a master class which can be inherited in two ways to perform following tasks:
  * a) Run DSTAP as an algorithm
  * b) Run DSTAP as a heuristic without subnetwork artificial links
  * @author Venktesh (venktesh at utexas dot edu)
  */
-public class DSTAPOptimizer {
-    private final List<String> subnetworkNames;
-    private MasterNetwork masterNet;
-    private FullNetwork fullNet;
-    private List<SubNetwork> subNets;
+public abstract class DSTAPOptimizer {
+    protected final List<String> subnetworkNames;
+    protected MasterNetwork masterNet;
+    protected FullNetwork fullNet;
+    protected List<SubNetwork> subNets;
     
-    private String printVerbosityLevel; //LEAST, LOW, MEDIUM, HIGH
-    private Boolean runSubnetsInParallel; //or false
-    private double demandFactor;
+    protected String printVerbosityLevel; //LEAST, LOW, MEDIUM, HIGH
+    protected Boolean runSubnetsInParallel; //or false
+    protected double demandFactor;
 
     public DSTAPOptimizer() {
-        subnetworkNames = new ArrayList<>();
-        printVerbosityLevel = "LEAST";
-        runSubnetsInParallel = false;
-        demandFactor = 1.0;
-        subNets = new ArrayList<>();
+        this("LEAST",false,1.0);        
     }
 
     public DSTAPOptimizer(String printVerbosityLevel, Boolean runSubnetsInParallel, double demandFactor) {
@@ -50,11 +46,14 @@ public class DSTAPOptimizer {
     //=============================================//
     
     public void readInputsAndInitialize(String folderName){
-        readSubnetNames(folderName);
+        readSubnetNames(folderName+"/Inputs/");
         initAndRelateAllNetworks();
-        readAllNetworkInputFiles(folderName);
+        readAllNetworkInputFiles(folderName+"/Inputs/");
         copyToFullNetwork();
+        updateNodeList();
         generateArtificialLinksAndODPairs();
+        updateNodeList();
+        printNetworkReadingStatistics();
     }
     
     private void readSubnetNames(String folderName){
@@ -73,7 +72,8 @@ public class DSTAPOptimizer {
     
     /**
      * Initializes all network variables in an order
-     * Relate each network with the other. Like each subnetwork should know what variable is masternet and likewise
+     * Relate each network with the other. Like each subnetwork should know what 
+     * object is masternetwork and likewise
      */
     private void initAndRelateAllNetworks(){
         masterNet = new MasterNetwork(printVerbosityLevel, "masterNet");
@@ -94,32 +94,38 @@ public class DSTAPOptimizer {
         }
     }
     
-    private void readAllNetworkInputFiles(String folderName){
+    protected void readAllNetworkInputFiles(String folderName){
         masterNet.readNetwork(folderName+"regionalLinks.txt");
         for(SubNetwork s: subNets){
             s.readInTrips(folderName+s.networkName+"In_Trips.txt", demandFactor);
             s.readNetwork(folderName+s.networkName+"_net.txt");
         }
+        //we need to read network file for all subnetworks before we read OutTrips for all
         for(SubNetwork s:subNets){
             s.readOutTrips(folderName+s.networkName+"Out_Trips.txt", demandFactor);
         }
     }
     
-    private void copyToFullNetwork(){
+    protected void copyToFullNetwork(){
         for(SubNetwork s: subNets)
             fullNet.copySubNetwork(s);
         fullNet.copyMasterNet(masterNet);
     }
     
-    private void generateArtificialLinksAndODPairs(){
-        for(SubNetwork s: subNets){
-            s.generateOriginsAndDestDueToOtherSubnet();
+    abstract void generateArtificialLinksAndODPairs();
+    
+    private void updateNodeList(){
+        masterNet.updateNodeList();
+        for(SubNetwork subnet: subNets){
+            subnet.updateNodeList();
         }
-        for(SubNetwork s: subNets)
-            s.createMasterNetArtificialLinksAndItsODPair();
-
-        for(SubNetwork s: subNets)
-            s.createThisSubnetODPairs_otherSubnetALink();
+    }
+    
+    private void printNetworkReadingStatistics(){
+        masterNet.printMasterNetworkStatistics();
+        for(SubNetwork subnet: subNets){
+            subnet.printSubNetworkStatistics();
+        }
     }
     
 }

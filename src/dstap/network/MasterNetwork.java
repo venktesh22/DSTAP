@@ -25,8 +25,11 @@ public class MasterNetwork extends Network{
     protected Map<Integer, Node> boundaryNodesByID;// nodes at the urban boundaries
     protected  Set<SubNetwork> subNetworks;//list of subnetworks modeld in the master network
     protected Map<Link, Set<ODPair>> physicalLink_subNetODSet;
+    
+    protected Set<ArtificialLink> artificialLinks;
     /*
     for each artificial link in the master net saves the associated OD pair in sub network
+    shouldn't it be called artificialLink to subNetODSet?
      */
     
     public MasterNetwork(String verbosityLevel, String name){
@@ -36,6 +39,8 @@ public class MasterNetwork extends Network{
         
         subNetworks = new HashSet<>();
         physicalLink_subNetODSet = new HashMap<>();
+        
+        artificialLinks = new HashSet<>();
     }
     
     /**
@@ -59,13 +64,11 @@ public class MasterNetwork extends Network{
                 inputFile.nextLine();
 
                 Node origin = null, dest = null;
-                if (!nodesByID.containsKey(originId))
-                {
+                if (!nodesByID.containsKey(originId)){
                     nodesByID.put(originId, origin = new Node(originId, "masterNet"));
                     boundaryNodesByID.put(originId, origin);
                 }
-                if (!nodesByID.containsKey(destId))
-                {
+                if (!nodesByID.containsKey(destId)){
                     nodesByID.put(destId, dest = new Node(destId, "masterNet"));
                     boundaryNodesByID.put(destId, dest);
                 }
@@ -124,8 +127,7 @@ public class MasterNetwork extends Network{
      * @return the artificial link created in the master network
      */
     public ArtificialLink createArtificialLinks(int origin_id, int dest_id, 
-            double fft, ArtificialODPair subNetODPair)
-    {
+            double fft, ArtificialODPair subNetODPair){
         ArtificialLink l=null;
         boolean doesItAlreadyExist= false;
         /*
@@ -150,6 +152,7 @@ public class MasterNetwork extends Network{
             links.add(l = new ArtificialLink(origin, dest, fftime, 
                     coef, power, cap, networkName));
 
+        artificialLinks.add(l);
         if(subNetODPair!=null)
             l.setAssociatedODPair(subNetODPair);
         else{
@@ -158,5 +161,27 @@ public class MasterNetwork extends Network{
         }
             
         return l;
+    }
+    
+    public void printMasterNetworkStatistics(){
+        printNetworkStatistics();
+        System.out.println(" Boundary Nodes = "+boundaryNodesByID.keySet());
+        System.out.println(" No of artificial links = "+artificialLinks.size());
+        System.out.println(" Artificial Links = "+artificialLinks);
+        
+        int artifiODPairsNumber =0;
+        System.out.println("Artificial OD pairs");
+        for(Node origin: tripTable.getOrigins()){
+            for(ODPair od: tripTable.byOrigin(origin)){
+                if(od instanceof ArtificialODPair){
+                    System.out.print("\t"+od);
+                    artifiODPairsNumber++;
+                }
+            }
+        }
+        System.out.println("");
+        System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
+        System.out.println(" Physical Link to SubNetODPair mapping is "+physicalLink_subNetODSet);
+        
     }
 }

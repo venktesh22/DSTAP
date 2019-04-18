@@ -63,5 +63,14 @@ public class ODPair {
         return bush;
     }
     
+    public void addToDemand(double d){
+        demand += d;
+    }
+
+    @Override
+    public String toString() {
+        return "{" + origin + "-->" + dest + '}';
+    }
+    
     
 }

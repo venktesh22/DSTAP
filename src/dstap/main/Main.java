@@ -27,9 +27,15 @@ public class Main {
         Boolean runSubnetsInParallel = true; //or false
         double demandFactor = 1.0; // 0.5 means 50% demand and likewise
         
-        DSTAPOptimizer optimizer = new DSTAPOptimizer(printVerbosityLevel, 
+//        DSTAPasAlgorithm optimizer = new DSTAPasAlgorithm(printVerbosityLevel, 
+//                runSubnetsInParallel, demandFactor);
+        
+        DSTAPHeuristic optimizer = new DSTAPHeuristic(printVerbosityLevel, 
                 runSubnetsInParallel, demandFactor);
         
+        // We assume inputs are in the format where all subnetwork trips completely
+        //within the subnetwork are in separate file than the trips from one
+        //subnetwork to the other. This simplifies creation of artificial links.
         optimizer.readInputsAndInitialize(folderName);
     }
 }

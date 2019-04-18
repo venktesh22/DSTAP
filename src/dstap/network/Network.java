@@ -24,7 +24,6 @@ import java.util.Set;
 abstract class Network {
     protected Set<Link> links;
     protected Set<Link> physicalLinks;
-    protected Set<ArtificialLink> artificialLinks;
     
     protected Set<Node> nodes;
     protected Map<Integer, Node> nodesByID;
@@ -36,30 +35,19 @@ abstract class Network {
     
     //gap calculation variables
     protected double TSTT; //total system travel time
-    protected double SPTT; //shortest path travel time
+    protected double SPTT; //shortest path travel time (TSTT when all vehicles go on shortest path assuming constant costs)
     protected List<Double> gapValues;
     protected List<Double> excessCosts;
     protected List<Double> avgExcessCosts;
     
     public Network(){
-        printVerbosityLevel = "LEAST";
-        links = new HashSet<>();
-        physicalLinks = new HashSet<>();
-        artificialLinks = new HashSet<>();
-        
-        nodes = new HashSet<>();
-        nodesByID = new HashMap<>();
-        tripTable = new TripTable();
-        excessCosts = new ArrayList<>();
-        avgExcessCosts = new ArrayList<>();
-        gapValues = new ArrayList<>();
+        this("LEAST");
     }
     
     public Network(String verbosityLevel){
         printVerbosityLevel = verbosityLevel;
         links = new HashSet<>();
         physicalLinks = new HashSet<>();
-        artificialLinks = new HashSet<>();
         
         nodes = new HashSet<>();
         nodesByID = new HashMap<>();
@@ -69,6 +57,7 @@ abstract class Network {
         gapValues = new ArrayList<>();
     }
         
+    //replace Dijkstra with efficient shortest path routines
     public void dijkstras(Node origin){
         for(Node n : nodes){
             n.label = Double.MAX_VALUE;
@@ -89,11 +78,11 @@ abstract class Network {
                 }
             }
             count++;
-            if(count> nodes.size()*2){
+            if(count> 10*Math.pow(nodes.size(),2)){
                 System.out.println("Stuck in Dijkstra somehow");
             }
             Q.remove(u);
-            for (Link l : u.getOutgoing()){
+            for (Link l : u.getOutgoing()) {
                 Node v = l.getDest();
                 double alt = u.label + l.getTravelTime();
                 if(alt < v.label){
@@ -103,6 +92,34 @@ abstract class Network {
                 }
             }
         }
+    }
+    
+    public void updateNodeList(){
+        for(Integer id: nodesByID.keySet()){
+            if(!nodes.contains(nodesByID.get(id)))
+                nodes.add(nodesByID.get(id));
+        }
+    }
+    
+    public void printNetworkStatistics(){
+        System.out.println("\n=== Network "+networkName+" has following statistics=====");
+        System.out.println(" No of nodes = "+nodes.size());
+        System.out.println(" No of links = "+links.size());
+        System.out.println("  and the Links are: \n"+links);
+        System.out.println(" No of physical links = "+physicalLinks.size());
+        System.out.println(" No. of origins = "+ tripTable.getOrigins().size());
+        
+        double demand=0.0;
+        int odPairsNumber =0;
+        for(Node origin: tripTable.getOrigins()){
+            for(ODPair od: tripTable.byOrigin(origin)){
+                demand+= od.getDemand();
+                odPairsNumber++;
+                System.out.println("---OD pair "+od+" has demand="+od.getDemand()+" and "+ ((od instanceof ArtificialODPair)?"Artificial":"Regular"));
+            }
+        }
+        System.out.println(" No of OD pairs = "+ odPairsNumber);
+        System.out.println(" Total demand = "+ demand);
     }
     
 }

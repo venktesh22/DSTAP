@@ -150,7 +150,8 @@ public class Link {
 
     @Override
     public String toString(){
-        return "["+source.getId()+", "+dest.getId()+" , "+type+"]";//+", "+fftime+", "+alpha+", "+capacity+", "+beta+"]";
+//        return "["+source.getId()+", "+dest.getId()+" , "+type+"]";//+", "+fftime+", "+alpha+", "+capacity+", "+beta+"]";
+        return "["+source.getId()+", "+dest.getId()+" , "+type+", "+fftime+", "+power+", "+capacity+", "+coef+"]";
     }
     
     @Override
