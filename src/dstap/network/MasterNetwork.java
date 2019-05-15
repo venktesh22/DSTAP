@@ -182,6 +182,6 @@ public class MasterNetwork extends Network{
         System.out.println("");
         System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
         System.out.println(" Physical Link to SubNetODPair mapping is "+physicalLink_subNetODSet);
-        
     }
+    
 }

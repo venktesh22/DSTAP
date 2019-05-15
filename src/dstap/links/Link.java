@@ -18,16 +18,18 @@ public class Link {
     protected String type;// subNet, masterNet, fullNet
 
     double flow; // flow
+    protected double previousItrFlow; //this is same as flow but in previous iteration of TAP
      //dx_ij/dX (derivative of link flow wrt change in demand between an OD pair
     protected double dxdX;
     
-    public double x_star; // new flow
+    //public double x_star; // new flow
     protected double centralizedFlow; //flow on the complete network
 
     public Link(Node source, Node dest){
         this.source = source;
         this.dest = dest;
         flow = 0;
+        this.previousItrFlow = this.flow;
         source.addLink(this);
         dest.addLink(this);
     }
@@ -39,7 +41,8 @@ public class Link {
         type = t;
 
         flow = 0;
-        x_star = 0;
+        this.previousItrFlow = this.flow;
+        //x_star = 0;
 
         source.addLink(this);
         dest.addLink(this);
@@ -58,7 +61,7 @@ public class Link {
         this.coef = cof;
     }
 
-    public void updateFlow(double x){
+    public void addToFlow(double x){
         if(Double.isNaN(x)){
             System.out.println("Flow update value for link "+this+ "is NaN. Exiting");
             System.exit(1);
@@ -146,6 +149,14 @@ public class Link {
     public double calcDer(double x){
         //dx/dt
         return (double) fftime * coef * power * Math.pow(x / capacity, power - 1) / capacity;
+    }
+
+    public double getPreviousItrFlow() {
+        return previousItrFlow;
+    }
+    
+    public void resetPreviousItrFlow(){
+        this.previousItrFlow = this.flow;
     }
 
     @Override

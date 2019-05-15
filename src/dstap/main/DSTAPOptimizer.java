@@ -8,10 +8,12 @@ package dstap.main;
 import dstap.network.*;
 import java.io.File;
 import java.io.IOException;
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This modified version of Ehsan's code provides a different organization of files, variables, and inputs
@@ -54,6 +56,7 @@ public abstract class DSTAPOptimizer {
         generateArtificialLinksAndODPairs();
         updateNodeList();
         printNetworkReadingStatistics();
+        createODstems();
     }
     
     private void readSubnetNames(String folderName){
@@ -126,6 +129,83 @@ public abstract class DSTAPOptimizer {
         for(SubNetwork subnet: subNets){
             subnet.printSubNetworkStatistics();
         }
+        fullNet.printNetworkStatistics();
     }
     
+    protected void createODstems(){
+        masterNet.createODStems();
+        for(SubNetwork s: subNets)
+            s.createODStems();
+        fullNet.createODStems();
+    }
+    
+    //=============================================//
+    //======Functions for solving DSTAP============//
+    //=============================================//
+    
+    public void runOptimizer() throws InterruptedException{
+        System.out.println("================\n====Solving DSTAP=====\n===============");
+        boolean artificialLinksConstantTT = false; //if true, then sensivity analysis is not performed
+        //(below) tracks if the optimizer has converged. Convergence criteria can be multi-faceted
+        boolean hasConverged = false;
+        
+        double masterGap = 0.0001, masterODGap = 0.1, masterGapRate = 0.9;
+        double subNetGap = 0.001, subNetODGap = 0.1, subNetGapRate = 0.2;
+        //@todo for now ignoring the changes in rate based on new and old fullNetworkGap
+        
+        int itrNo = 0;
+        
+        while(!hasConverged){
+            
+            masterGap = masterGapRate * masterGap;
+            masterODGap = masterGap;
+
+            System.out.println("\n--Solving Master network in iteration: "+itrNo +" to a gap of "+masterGap);
+            masterNet.solver(masterGap, masterODGap, itrNo);
+            
+            //function for updating subnetwork demand using masterNet artificial link flows
+            
+            //function for solving each subnetwork in parallel
+            if(this.runSubnetsInParallel){
+                double startTimeSubnetEval = System.currentTimeMillis();
+                //got the information for parallelization from http://www.vogella.com/tutorials/JavaConcurrency/article.html
+                ExecutorService executor = Executors.newFixedThreadPool(subnetworkNames.size());
+                for(SubNetwork subNet: subNets){
+                    Runnable worker = new SubnetSolverRunnable(subNet, subNetGap, subNetODGap, itrNo); //, getGap, costFunc);
+                    executor.execute(worker);
+                }
+                executor.shutdown();
+                executor.awaitTermination(5, TimeUnit.MINUTES); //wait for an UPPERLIMIT of 5 min when one subnet finishes and other is still running. 
+                System.out.println("All threads finished");
+                System.out.println("Time to solve the subnetworks: "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
+
+//                for (SubNetwork subNet : subNets)
+//                {
+//    //                subNet.solver(subGap, subOdgap,itr, getGap);
+//    //                subNet.updateArtificialLinks(costFunc, 1E-5);
+//                    tstt += subNet.getTotalUrbanCost();
+//                    minCost += subNet.getMinUrbanCost();
+//                }
+            }
+            else{
+                
+                for (SubNetwork subNet : subNets)
+                {
+                    double startTimeSubnetEval = System.currentTimeMillis();
+                    subNet.solver(subNetGap, subNetODGap, itrNo);
+//                    subNet.updateArtificialLinks(costFunc, 1E-5);
+                    System.out.println("Time to solve the subnetwork "+ subNet.networkName+": "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
+                }
+                
+//                for(SubNetwork subNet: subNets){
+//                    tstt += subNet.getTotalUrbanCost();
+//                    minCost += subNet.getMinUrbanCost();
+//                }
+            }
+            
+            //
+            
+            hasConverged = true; //for debug phase. Remove after code is done
+        }
+    }
 }

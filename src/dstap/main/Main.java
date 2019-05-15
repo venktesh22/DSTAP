@@ -37,5 +37,6 @@ public class Main {
         //within the subnetwork are in separate file than the trips from one
         //subnetwork to the other. This simplifies creation of artificial links.
         optimizer.readInputsAndInitialize(folderName);
+        optimizer.runOptimizer();
     }
 }

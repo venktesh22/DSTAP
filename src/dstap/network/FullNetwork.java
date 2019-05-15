@@ -54,6 +54,7 @@ public class FullNetwork extends Network{
                     nodesByID.get(l.getDest().getId()), l.getFFTime(), l.getCoef(),
                     l.getPower(), l.getCapacity(), networkName));
             this.links.add(ll);
+            this.physicalLinks.add(ll);
             otherNetLinkToFullLink.put(l, ll);
         }
 
@@ -84,6 +85,7 @@ public class FullNetwork extends Network{
                 this.links.add(ll = new Link(nodesByID.get(l.getSource().getId()), 
                         nodesByID.get(l.getDest().getId()), l.getFFTime(), 
                         l.getCoef(), l.getPower(), l.getCapacity(), networkName));
+                this.physicalLinks.add(ll);
                 otherNetLinkToFullLink.put(l, ll);
             }
         }
