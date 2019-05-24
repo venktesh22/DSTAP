@@ -114,7 +114,12 @@ public class Link {
     }
 
     public double getTravelTime(double x){
-        return fftime * (1 + coef * Math.pow(x / capacity, power) );
+        double time= fftime * (1 + coef * Math.pow(x / capacity, power) );
+        if(time<0){
+            System.out.println("Travel time for link "+this+" is negative. Current flow="+x+". Returning zero travel time instead.");
+            return 0;
+        }
+        return time;
     }
 
     public double getFlow(){
@@ -126,7 +131,7 @@ public class Link {
         return dxdX;
     }
 
-    public double getBushCost()   
+    public double getSensitivityCost()   
     {
         //dt/dX=dt/dx * dx/dX
         return dxdX * calcDer();
@@ -157,6 +162,10 @@ public class Link {
     
     public void resetPreviousItrFlow(){
         this.previousItrFlow = this.flow;
+    }
+    
+    public void setFlow(double flow){
+        this.flow = flow;
     }
 
     @Override

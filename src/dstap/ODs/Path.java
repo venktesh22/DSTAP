@@ -37,6 +37,10 @@ public class Path {
         pathLinks.add(0,l);
     }
     
+    public void addLinkToBack(Link l){
+        pathLinks.add(l);
+    }
+    
     public void updatePathCost(){
         double newCost = 0;
 //        System.out.println("--Path "+this+" ");
@@ -51,9 +55,9 @@ public class Path {
     public void updatePathSensitivityCost(){
         double newCost = 0;
         for (Link l : this.pathLinks){
-            newCost += l.getdxdX();
+            newCost += l.getSensitivityCost();
         }
-        setCost(newCost);
+        setSensitivityCost(newCost);
     }
 
     public double getCost() {
@@ -64,21 +68,27 @@ public class Path {
     private void setCost(double cost) {
         this.cost = cost;
     }
+    
+    //this method is only called during mapping DSTAP flow to full network
+    //otherwise we do not intend to accidently update the flow and we only do it using "addToPathFlow" function
+    public void setFlow(double flow){
+        this.flow=flow;
+    }
 
     public double getFlow() {
         return flow;
     }
 
-    public void setFlow(double flow) {
-        this.flow = flow;
-    }
+//    public void setFlow(double flow) {
+//        this.flow = flow;
+//    }
 
     public double getSensitivityCost() {
         updatePathSensitivityCost();
         return sensitivityCost;
     }
 
-    public void setSensitivityCost(double sensitivityCost) {
+    private void setSensitivityCost(double sensitivityCost) {
         this.sensitivityCost = sensitivityCost;
     }
 
@@ -88,20 +98,45 @@ public class Path {
 
     public void setSensitivityFlow(double sensitivityFlow) {
         this.sensitivityFlow = sensitivityFlow;
+        for(Link l : this.getPathLinks()){
+            l.setdxdX(l.getdxdX() + sensitivityFlow);
+        }
     }
+    
+    public void addToSensitivityFlow(double change){
+        this.sensitivityFlow += change;
+        for(Link l : this.getPathLinks()){
+            l.setdxdX(l.getdxdX() + change);
+        }
+    }
+    
+    
 
     public List<Link> getPathLinks() {
         return pathLinks;
     }
     
+    //simultaneous addition of change flow to both path and its links
     public void addToPathFlow(double change){
         flow += change;
-        for(Link l : this.pathLinks){
-            l.addToFlow(change);
-        }
+        assignPathFlowToLinks(change);
         if (flow < -1E-10){
             System.out.println("Path "+ this+" has negative flow of\t"+flow);
             System.exit(1);
+        }
+    }
+    
+    //this function exists for mapping DSTAP to full net flow
+    //we somehow do not simultaneously update path and link flow and that's why
+    //we use setflow() function to keep track of pathflow and later use this function
+    //to assign it to the links
+    public void assignPathFlowToLinks(){
+        this.assignPathFlowToLinks(this.flow);
+    }
+    
+    public void assignPathFlowToLinks(double change){
+        for(Link l : this.pathLinks){
+            l.addToFlow(change);
         }
     }
 

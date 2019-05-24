@@ -1,0 +1,5 @@
+Total error:	11449.5350429
+Total flow:	33999.9999989
+% error:	0.3367510306844243
+Max error of	3309.7901328943767	 for link 	[4, 5 , fullNet]
+Run time:	3760	 ms

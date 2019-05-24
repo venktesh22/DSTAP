@@ -15,14 +15,16 @@ import dstap.nodes.Node;
  */
 public class ArtificialODPair extends ODPair{
     private ArtificialLink associatedALink;
-    private Stem bush; //only an artifical OD pair has a bush associated w it
+    private double demandDueToALink;
 
     public ArtificialODPair(Node origin, Node dest) {
         super(origin, dest);
+        this.demandDueToALink = 0.0;
     }
     
     public ArtificialODPair(Node origin, Node dest, double d) {
         super(origin, dest, d);
+        this.demandDueToALink = 0.0; //when a OD pair is first demand demandDueToALink is zero
     }
 
     public ArtificialLink getAssociatedALink() {
@@ -32,13 +34,39 @@ public class ArtificialODPair extends ODPair{
     public void setAssociatedALink(ArtificialLink associatedALink) {
         this.associatedALink = associatedALink;
     }
-
-    public Stem getBush() {
-        return bush;
+    
+    @Override
+    public double getDemand() {
+        return this.demand + this.demandDueToALink;
+    }
+    
+    public double getOriginalDemand(){
+        return this.demand;
+    }
+    
+    public double getDemandDueToALink(){
+        return this.demandDueToALink;
     }
 
-    public void setBush(Stem bush) {
-        this.bush = bush;
+    //updates the demandDueToALink to the newDemand
+    //If total demand = 0, then it resets the paths for the OD's stem (clears those)
+    //If there are current paths for the ODPair's stem and totalDemand>0, then it adjust path flows
+    //If no current paths and there is new demand, then do nothing but update the demand for next iteration
+    public void updateDemandDueToALink(double newDemand) {
+        double changeInDemand = newDemand - this.demandDueToALink;
+
+        if (getDemand()+newDemand==0){
+            this.getStem().getPathSet().clear();
+        }
+        else if (this.getStem().getPathSet().size() > 0){
+            this.getStem().assignExtraDemandToPathFlows(changeInDemand);
+        }
+        
+//        System.out.print("Updating "+this+" od pair's demandDueToALink from "+this.demandDueToALink+" to "+newDemand);
+        this.demandDueToALink = newDemand;
+//        System.out.print(" where updated total demand="+getDemand()+"\n");
+        this.getStem().updateCost();
     }
+    
     
 }

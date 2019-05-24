@@ -42,9 +42,9 @@ public class SubNetwork extends Network {
     protected Set<ArtificialLink> artificialLinks;
     private Set<ExtraNodeLink> extraNodeLinks;
     
-    private Set<ArtificialODPair> artificialODs;
+    //private Set<ArtificialODPair> artificialODs;
     //useful for running dijkstra once by origin
-    private Map<Node, Set<ArtificialODPair>> artificialODsByOrigin;
+    //private Map<Node, Set<ArtificialODPair>> artificialODsByOrigin;
     
     public SubNetwork(MasterNetwork masterNetwork, String verbosityLevel, String name){
         super(verbosityLevel);
@@ -55,8 +55,8 @@ public class SubNetwork extends Network {
         extraNodes = new HashSet<>();
         extraNodeLinks = new HashSet<>();
         artificialLinks = new HashSet<>();
-        artificialODs = new HashSet<>();
-        artificialODsByOrigin = new HashMap<>();
+//        artificialODs = new HashSet<>();
+//        artificialODsByOrigin = new HashMap<>();
         
         originsInMasterNet = new HashSet<>();
         destsInMasterNet = new HashSet<>();
@@ -250,7 +250,7 @@ public class SubNetwork extends Network {
      * these are OD pairs created in THIS subnetwork where the endpoints are in the other subnet
      * We call these "EXTRA" nodes
      * origin artificial nodes have 10000 added to them and destinations have 20000 added to them
-     * here we create the nodes in this subnetwork (extra nodes) and the associated artificial OD pair
+     * here we create the nodes in this subnetwork (extra nodes) and the associated regular OD pair
      * @param origin_id
      * @param dest_id
      * @param demand
@@ -311,19 +311,19 @@ public class SubNetwork extends Network {
                 }
                 //Also create an OD pair
                 //@todo: for now not doing it;
-                if(tripTable.getTrips().containsKey(source)){
-                    if (!tripTable.getTrips().get(source).containsKey(dest)){
-                        tripTable.addODpair(source, dest, 0);
-                    }
-                }
-                else
-                    tripTable.addODpair(source, dest, 0);
-                ODPair subNetODPair = tripTable.getODPair(source, dest);
-                
-                Set<ODPair> temp = new HashSet<>();
-                if(masterNet.physicalLink_subNetODSet.containsKey(l))
-                    temp= masterNet.physicalLink_subNetODSet.get(l);
-                temp.add(subNetODPair);
+//                if(tripTable.getTrips().containsKey(source)){
+//                    if (!tripTable.getTrips().get(source).containsKey(dest)){
+//                        tripTable.addODpair(source, dest, 0);
+//                    }
+//                }
+//                else
+//                    tripTable.addODpair(source, dest, 0);
+//                ODPair subNetODPair = tripTable.getODPair(source, dest);
+//                
+//                Set<ODPair> temp = new HashSet<>();
+//                if(masterNet.physicalLink_subNetODSet.containsKey(l))
+//                    temp= masterNet.physicalLink_subNetODSet.get(l);
+//                temp.add(subNetODPair);
                 
             }
         }
@@ -342,19 +342,19 @@ public class SubNetwork extends Network {
                 
                 //Also create an OD pair
                 //@todo: for now not doing it;
-                if(tripTable.getTrips().containsKey(source)){
-                    if (!tripTable.getTrips().get(source).containsKey(dest)){
-                        tripTable.addODpair(source, dest, 0);
-                    }
-                }
-                else
-                    tripTable.addODpair(source, dest, 0);
-                ODPair subNetODPair = tripTable.getODPair(source, dest);
-                
-                Set<ODPair> temp = new HashSet<>();
-                if(masterNet.physicalLink_subNetODSet.containsKey(l))
-                    temp= masterNet.physicalLink_subNetODSet.get(l);
-                temp.add(subNetODPair);
+//                if(tripTable.getTrips().containsKey(source)){
+//                    if (!tripTable.getTrips().get(source).containsKey(dest)){
+//                        tripTable.addODpair(source, dest, 0);
+//                    }
+//                }
+//                else
+//                    tripTable.addODpair(source, dest, 0);
+//                ODPair subNetODPair = tripTable.getODPair(source, dest);
+//                
+//                Set<ODPair> temp = new HashSet<>();
+//                if(masterNet.physicalLink_subNetODSet.containsKey(l))
+//                    temp= masterNet.physicalLink_subNetODSet.get(l);
+//                temp.add(subNetODPair);
             }
         }
     }
@@ -518,6 +518,125 @@ public class SubNetwork extends Network {
         System.out.println("");
         System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
         
+    }
+    
+    //=============================================//
+    //--methods for doing bush-based sensitivity---//
+    //=============================================//
+    public void updateArtificialLinks(boolean costFunc, double gap){
+        for (Node origin : this.tripTable.getArtificialODPairs().keySet()){
+            boolean shortestPathExists = false;
+            for(Node dest: this.tripTable.getArtificialODPairs().get(origin).keySet()){
+                ArtificialODPair od = this.tripTable.getArtificialODPairs().get(origin).get(dest);
+                Stem stem = od.getStem();
+                double d_0 = od.getDemandDueToALink();
+                double t_0 = 0;
+                double t_p = 0;
+                
+                //there may already be a path from true demand
+                if(d_0 == 0 && stem.getPathSet().isEmpty()){
+                    //there may be no path from origin to dest so bush-based sensitivity might be flawed
+                    //@todo: handle this case. I kinda think that we don't need to do anything for this case
+                    //For now, I am running dijkstra and adding one path...
+                    //BUT what about the case where d_0=0, but there is true demand between OD pair, if you clear the path
+                    //then the path flows will become zero and we will loose. Key is in knowing that some ODs may have
+                    if (!shortestPathExists){
+                        dijkstras(origin);
+                        shortestPathExists = true;
+                    }
+                    Path temp = trace(od);
+                    if(!temp.getPathLinks().isEmpty()){
+                        stem.getPathSet().clear();
+                        stem.addPath(temp);
+                    }
+                    t_0 = od.getDest().label;
+                }
+                else{
+                    t_0 = od.getODCostAtUE();
+                }
+                runStemBasedSensitivityAnalysis(stem, gap);
+                ArtificialLink aLink = od.getAssociatedALink();
+                t_p = stem.getTimeDerivative();
+                
+                double aLinkFFTT = t_0 - t_p * d_0;
+                double aLinkCoef=0;
+                if(t_p / (t_0 - t_p * d_0) != 0)
+                    aLinkCoef= t_p / (t_0 - t_p * d_0);
+                else{
+                    System.out.println("Artificial link ffTT is not set right. It cannot be zero or negative");
+                    System.out.println("aLinkFFTT="+aLinkFFTT+" where t_0="+t_0+", t_p="+t_p+" and d_0="+d_0);
+                    System.exit(1);
+                }
+                
+//                System.out.println("Alink being updated="+aLink);
+//                System.out.println("--New TT function="+aLinkFFTT+"(1+"+aLinkCoef+"x), where the demand using the aLink="+d_0);
+                aLink.setFftime(aLinkFFTT);
+                aLink.setCoef(aLinkCoef);
+            }
+        }
+
+        if (this.printVerbosityLevel.equals("MEDIUM"))
+            System.out.println("Subnetwork "+this+" sensitivity analysis completed");
+    }
+    
+    /**
+     * The method below is similar to the solver for traffic assignment but operating
+     * in terms of sensitivity analysis parameters. Finds the time derivative for a stem
+     * sets dx_ij/dX = 0 for all links
+     * and distribute one unit flow equally between bush paths, 
+     * updates dx_ij/dX and the path cost as sum of dt_ij/dX
+     * @param stem: the stem over which sensitivity is being done
+     * @param gap : relative gap to which the sensitivity analysis problem should be solved
+     */
+    public void runStemBasedSensitivityAnalysis(Stem stem, double gap){
+        resetStemForSensitivity(stem);
+        switch(stem.getPathSet().size()){
+            case 0: System.out.println("Subnet - stem "+stem+ " with no path"+networkName);
+                    System.exit(1);
+                    break;
+                
+            case 1: stem.updateTimeDerivative();
+                    break;
+                
+            default: int count=0;
+                int odCounter = 0;
+                double costDiff = stem.getCostDiffBetLongestAndShortestPaths(true);
+                boolean isBushSensitivityConverged = (costDiff<gap);
+//                            System.out.println("===Cost difference for this OD is "+costDiff);
+
+                while (!isBushSensitivityConverged){// && odCounter<5){
+                    odCounter++;
+                    /*
+                    shift flow between longest and shortest paths and update their associated link flow
+                     */
+//                                od.limitedShiftFlow(rate);
+                    stem.shiftLimitedFlowFromAllPathstoSP(1.0,true);
+
+                    stem.updateCost(true);
+                    //od.getStem().dropPathsWFlowltThresh(1E-9); /* removes unused paths, but we ignore this in bush analysis */
+                    costDiff = stem.getCostDiffBetLongestAndShortestPaths(true);
+                    isBushSensitivityConverged = (costDiff<gap);
+//                                isODConverged = true; //Forcing one iteration of Netwon's method for flow shifting.
+                }
+                stem.updateTimeDerivative();
+                break;
+        }
+    }
+    
+    private void resetStemForSensitivity(Stem stem){
+        for (Path p : stem.getPathSet()){
+            for (Link l : p.getPathLinks()){
+                l.setdxdX(0);
+            }
+        }
+        /**
+         * split one unit of demand equally between bush paths
+         * assign flow to links
+         */
+        for (Path p : stem.getPathSet()){
+            p.setSensitivityFlow((double)1/stem.getPathSet().size());
+            p.updatePathSensitivityCost();/* updates the path cost as sum of dt_ij/dx_ij * dx_ij/dX */
+        }
     }
 
 

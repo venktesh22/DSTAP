@@ -218,6 +218,7 @@ abstract class Network {
         }
         boolean converged = false;
         //@todo: change the following statement about storing gap values to false if not needed
+        int subItrNo =0;
         if(true){
             this.setSPTT(0.0);
             resetLinkPrevItrFlows();
@@ -226,11 +227,15 @@ abstract class Network {
             this.initialGap = getGap();
             this.gapValues.add(initialGap);
             System.out.println("Initial gap of\t"+initialGap+"\t for \t"+networkName);
-            if(this.initialGap<gap){
-                converged = true;
-            }
+//            if(this.initialGap<gap){ //commented: read point below
+//                converged = true;
+//            }
         }
-        int subItrNo =0;
+        //regardless of if the first subitr gap< desired gap we run one iteration at least
+        //this is because suppose an OD pair which had zero demand earlier now has a demand
+        //gap of previous network was solved with OD with zero demand, and initial gap which
+        //is same as gap of previous mainItr will still satisfy that, but we still need to load
+        //the demand onto the new paths
         while(!converged){
 //            System.out.println("!!!!!!!!!!!!!!Starting subIteration "+subItrNo);
             int count = 0;
@@ -249,7 +254,7 @@ abstract class Network {
                         //first iteration where only one path and no flow on that path
                         if ((od.getStem().getPathSet().size() == 1) && (od.getStem().getShortestPath().getFlow()< 1E-10)){
                             od.getStem().getShortestPath().addToPathFlow(demand);
-                            od.getStem().updateAllPathsCost();
+                            od.getStem().updateCost();
                         } 
                         else if (od.getStem().getPathSet().size() > 1){
                             int odCounter = 0;
@@ -265,7 +270,7 @@ abstract class Network {
 //                                od.limitedShiftFlow(rate);
                                 od.getStem().shiftLimitedFlowFromAllPathstoSP(0.2,false);
 
-                                od.getStem().updateAllPathsCost();
+                                od.getStem().updateCost();
                                 od.getStem().dropPathsWFlowltThresh(1E-9); /* removes unused paths */
                                 if(itrNo>-1){
                                     costDiff = od.getStem().getCostDiffBetLongestAndShortestPaths();
@@ -275,15 +280,20 @@ abstract class Network {
                                 else
                                     isODConverged = true;
 //                                isODConverged = true; //Forcing one iteration of Netwon's method for flow shifting.
-                            }
+                            } 
                         }
                     }//end of demand>0 if
+                    //@todo: remove consistency checks all the time
+                    if(!od.checkFlowConsistency()){
+                        System.out.println("OD pair "+od+" is flow inconsistent. Terminating");
+                        System.exit(1);
+                    }
                 }//end of ODpair for loop
             }//end of looping through all origins
             double gapAtBeginningOfThisSubItr = getGap(beforeTSTT); //we have to get gap at end only because SPTT is updated only after solving all origin dijkstra
             if(gapAtBeginningOfThisSubItr<gap || subItrNo>500)
                 converged = true;
-            if("MEDIUM".equals(printVerbosityLevel)){
+            if("LEAST".equals(printVerbosityLevel)){
                 System.out.println("Network "+this.networkName+" subiteration "+subItrNo+" has gap value of "+gapAtBeginningOfThisSubItr);
             }
             subItrNo++;
@@ -294,6 +304,15 @@ abstract class Network {
 //                System.out.println("**Link "+l+" has flow="+l.getFlow()+" and TT="+l.getTravelTime());
 //            }
         }
+        for(Node origin : this.tripTable.getOrigins()){
+            for(ODPair od : this.tripTable.byOrigin(origin)){
+                if(!od.checkFlowConsistency()){
+                    System.out.println("OD pair "+od+" is flow inconsistent. Terminating");
+                    System.exit(1);
+                }
+            }
+        }
+        
         
         //evaluate final gap
         this.setSPTT(0.0);
@@ -302,7 +321,7 @@ abstract class Network {
             dijkstras(origin); //updates SPTT
         double finalGap = getGap();
         this.gapValues.add(finalGap);
-        if("MEDIUM".equals(printVerbosityLevel)){
+        if("LEAST".equals(printVerbosityLevel)){
             System.out.println("Network "+this.networkName+" subiteration "+subItrNo+" has FINAL gap value of "+finalGap);
         }
     }
@@ -397,7 +416,7 @@ abstract class Network {
         System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~");
     }
     
-    private void resetLinkPrevItrFlows(){
+    protected void resetLinkPrevItrFlows(){
         for(Link l: links)
             l.resetPreviousItrFlow();
     }

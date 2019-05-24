@@ -1,0 +1,2 @@
+iteration 	 gap
+0	0.0

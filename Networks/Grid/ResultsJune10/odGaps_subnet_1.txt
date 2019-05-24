@@ -1,0 +1,2 @@
+Origin 	 dest 	 numPaths 	 lpath cost 	 spath cost 	 minCost 	 diff between lPath and sPath
+2	6	2	5538.600001245793	5538.600001245788	5538.600001245788	4.547473508864641E-12

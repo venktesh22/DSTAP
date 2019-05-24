@@ -24,12 +24,13 @@ import java.util.Set;
 public class MasterNetwork extends Network{
     protected Map<Integer, Node> boundaryNodesByID;// nodes at the urban boundaries
     protected  Set<SubNetwork> subNetworks;//list of subnetworks modeld in the master network
-    protected Map<Link, Set<ODPair>> physicalLink_subNetODSet;
+    //protected Map<Link, Set<ODPair>> physicalLink_subNetODSet; 
     
     protected Set<ArtificialLink> artificialLinks;
     /*
     for each artificial link in the master net saves the associated OD pair in sub network
-    shouldn't it be called artificialLink to subNetODSet?
+    shouldn't it be called artificialLink to subNetODSet? No longer needed as each artificial
+    link class has an associated OD pair on its own
      */
     
     public MasterNetwork(String verbosityLevel, String name){
@@ -38,7 +39,7 @@ public class MasterNetwork extends Network{
         boundaryNodesByID = new HashMap<>();
         
         subNetworks = new HashSet<>();
-        physicalLink_subNetODSet = new HashMap<>();
+        //physicalLink_subNetODSet = new HashMap<>();
         
         artificialLinks = new HashSet<>();
     }
@@ -163,6 +164,19 @@ public class MasterNetwork extends Network{
         return l;
     }
     
+    /**
+     * This function updates the demand of the subnetwork OD pair using flow on artificial links
+     */
+    public void updateSubnetODsDemand(){
+        if("MEDIUM".equals(this.printVerbosityLevel)){
+            System.out.println("Updating demand for subnetwork ODs corresponding to master artificial links");
+        }
+        for(ArtificialLink l: this.artificialLinks){
+            l.getAssociatedODPair().updateDemandDueToALink(l.getFlow());
+        }
+        System.out.println("Done");
+    }
+    
     public void printMasterNetworkStatistics(){
         printNetworkStatistics();
         System.out.println(" Boundary Nodes = "+boundaryNodesByID.keySet());
@@ -181,7 +195,7 @@ public class MasterNetwork extends Network{
         }
         System.out.println("");
         System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
-        System.out.println(" Physical Link to SubNetODPair mapping is "+physicalLink_subNetODSet);
+        //System.out.println(" Physical Link to SubNetODPair mapping is "+physicalLink_subNetODSet);
     }
     
 }

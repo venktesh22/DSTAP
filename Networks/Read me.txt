@@ -1,0 +1,11 @@
+Grid:
+Acyclic grid network from Dial (1996) Bicriterion paper
+Partition of 2-3-5-6 and 1-4-7-8-9
+
+Grid_2
+Cyclic grid network with added links in reverse direction.
+Partition 6-8-9 and rest
+Lot of demand within subnetwork and outside of it
+
+Grid_3
+Same as Grid_2 but with less demand from one subnet to other

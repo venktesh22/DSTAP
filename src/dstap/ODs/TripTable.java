@@ -121,7 +121,7 @@ public class TripTable implements Iterable<ODPair> {
         if(odPairs.containsKey(o)){
             if(odPairs.get(o).containsKey(d)){
                 demand = demand + odPairs.get(o).get(d).getDemand();
-                odPairs.get(o).put(d, null);
+                odPairs.get(o).put(d, null); //get rid of regular OD pair created before because we are going to call it artificial OD pair!
             }
         }
         
@@ -171,6 +171,10 @@ public class TripTable implements Iterable<ODPair> {
 
     public Set<Node> getDests(){
         return dests;
+    }
+
+    public Map<Node, Map<Node, ArtificialODPair>> getArtificialODPairs() {
+        return artificialODPairs;
     }
 
     public Map<Node, Map<Node, ODPair>> getTrips(){

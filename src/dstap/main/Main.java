@@ -17,14 +17,16 @@ public class Main {
     /**
      * @param args folder location that contains all input files for the code
      */
-    public static void main(String[] args){
+    public static void main(String[] args) throws InterruptedException{
         //===============================================//
         //================Input variables================//
         //===============================================//
         //@todo: move following elements as part of the args to the main function
-        String folderName = "Networks/Grid_2/";
-        String printVerbosityLevel = "MEDIUM"; //LEAST, LOW, MEDIUM, HIGH
-        Boolean runSubnetsInParallel = true; //or false
+//        String folderName = "Networks/Grid_2/";
+//        String folderName = "Networks/Grid/";
+        String folderName = "Networks/DoubleSiouxFalls/";
+        String printVerbosityLevel = "LOW"; //LEAST, LOW, MEDIUM, HIGH
+        Boolean runSubnetsInParallel = false; //or false
         double demandFactor = 1.0; // 0.5 means 50% demand and likewise
         
 //        DSTAPasAlgorithm optimizer = new DSTAPasAlgorithm(printVerbosityLevel, 

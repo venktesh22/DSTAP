@@ -5,7 +5,9 @@
  */
 package dstap.main;
 
+import dstap.links.Link;
 import dstap.network.*;
+import dstap.nodes.Node;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -55,6 +57,7 @@ public abstract class DSTAPOptimizer {
         updateNodeList();
         generateArtificialLinksAndODPairs();
         updateNodeList();
+        fullNet.createODPairMappings();
         printNetworkReadingStatistics();
         createODstems();
     }
@@ -113,6 +116,7 @@ public abstract class DSTAPOptimizer {
         for(SubNetwork s: subNets)
             fullNet.copySubNetwork(s);
         fullNet.copyMasterNet(masterNet);
+        
     }
     
     abstract void generateArtificialLinksAndODPairs();
@@ -129,7 +133,7 @@ public abstract class DSTAPOptimizer {
         for(SubNetwork subnet: subNets){
             subnet.printSubNetworkStatistics();
         }
-        fullNet.printNetworkStatistics();
+        fullNet.printFullNetworkStatistics();
     }
     
     protected void createODstems(){
@@ -158,14 +162,17 @@ public abstract class DSTAPOptimizer {
         while(!hasConverged){
             
             masterGap = masterGapRate * masterGap;
-            masterODGap = masterGap;
+            masterODGap = Math.max(masterGap, 0.001);
 
             System.out.println("\n--Solving Master network in iteration: "+itrNo +" to a gap of "+masterGap);
             masterNet.solver(masterGap, masterODGap, itrNo);
             
             //function for updating subnetwork demand using masterNet artificial link flows
+            masterNet.updateSubnetODsDemand();
             
             //function for solving each subnetwork in parallel
+            subNetGap = subNetGapRate * subNetGap;
+            subNetODGap = Math.max(subNetGap, 0.001);
             if(this.runSubnetsInParallel){
                 double startTimeSubnetEval = System.currentTimeMillis();
                 //got the information for parallelization from http://www.vogella.com/tutorials/JavaConcurrency/article.html
@@ -179,33 +186,33 @@ public abstract class DSTAPOptimizer {
                 System.out.println("All threads finished");
                 System.out.println("Time to solve the subnetworks: "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
 
-//                for (SubNetwork subNet : subNets)
-//                {
-//    //                subNet.solver(subGap, subOdgap,itr, getGap);
-//    //                subNet.updateArtificialLinks(costFunc, 1E-5);
-//                    tstt += subNet.getTotalUrbanCost();
-//                    minCost += subNet.getMinUrbanCost();
-//                }
             }
             else{
-                
                 for (SubNetwork subNet : subNets)
                 {
                     double startTimeSubnetEval = System.currentTimeMillis();
                     subNet.solver(subNetGap, subNetODGap, itrNo);
-//                    subNet.updateArtificialLinks(costFunc, 1E-5);
+                    subNet.updateArtificialLinks(false, 1E-5);
                     System.out.println("Time to solve the subnetwork "+ subNet.networkName+": "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
                 }
-                
-//                for(SubNetwork subNet: subNets){
-//                    tstt += subNet.getTotalUrbanCost();
-//                    minCost += subNet.getMinUrbanCost();
-//                }
             }
+            System.out.println("\n\nMapping flow to full net");
+            double startTForMappingFlows= System.currentTimeMillis();
+            fullNet.mapDSTAPnetFlowToFullNet();
+            System.out.println("Time to map DSTAP flows to master and subnets:"+(System.currentTimeMillis()-startTForMappingFlows) + " milliseconds");
+            double fullNetGap = fullNet.getFullNetGap();
+            
+            
+//            startTForMappingFlows= System.currentTimeMillis();
+//            #fullNet.getExcessCosts();
+//            fullNetGapValues.add(newFullGap);
+//            System.out.println("Time to get excess costs:"+(System.currentTimeMillis()-startTForMappingFlows) + " milliseconds");
+            System.out.println("\n\n=======Actual gap on full net is " + fullNetGap+"======\n");
             
             //
-            
-            hasConverged = true; //for debug phase. Remove after code is done
+            itrNo++;
+            if(itrNo>30)
+                hasConverged = true; //for debug phase. Remove after code is done
         }
     }
 }

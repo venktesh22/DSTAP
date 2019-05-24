@@ -31,4 +31,18 @@ public class ArtificialLink extends Link {
         this.associatedODPair = associatedODPair;
     }
     
+    //we can have negative free flow travel time for artificial links
+    //the actual travel time should never be negative though!
+    public void setFftime(double fftt){
+//        if(fftt<0.0){
+//            System.out.println("FFTT negative"+fftt);
+//            System.exit(1);
+//        }
+        this.fftime = fftt;
+    }
+
+    public void setCoef(double coef) {
+        this.coef = coef;
+    }
+    
 }

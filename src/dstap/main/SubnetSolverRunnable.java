@@ -32,7 +32,7 @@ public class SubnetSolverRunnable implements Runnable{
     @Override
     public void run() {
         subNet.solver(subGap, subOdGap, itr);
-//        subNet.updateArtificialLinks(costFunc, 1E-5);
+        subNet.updateArtificialLinks(false, 1E-5);
     }
     
 }

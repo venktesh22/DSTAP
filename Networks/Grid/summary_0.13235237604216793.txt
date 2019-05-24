@@ -1,0 +1,5 @@
+Total error:	14870.745489815627
+Total flow:	33999.9999989
+% error:	0.4373748673616688
+Max error of	3137.616239	 for link 	[4, 7 , subnet_0]
+Run time:	140	 ms
