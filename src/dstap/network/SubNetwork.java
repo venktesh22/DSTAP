@@ -46,7 +46,7 @@ public class SubNetwork extends Network {
     //useful for running dijkstra once by origin
     //private Map<Node, Set<ArtificialODPair>> artificialODsByOrigin;
     
-    public SubNetwork(MasterNetwork masterNetwork, String verbosityLevel, String name){
+    public SubNetwork(MasterNetwork masterNetwork, int verbosityLevel, String name){
         super(verbosityLevel);
         networkName = name;
         
@@ -71,7 +71,7 @@ public class SubNetwork extends Network {
     
     public void readNetwork(String fileName){
         try(Scanner inputFile = new Scanner(new File(fileName))){
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel>=3)
                 System.out.println("Reading network data for subnetwork "+ networkName+"..");
             inputFile.nextLine();
             
@@ -114,7 +114,7 @@ public class SubNetwork extends Network {
                 inputFile.nextLine();
             }
             inputFile.close();
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >= 3)
                 System.out.println("Completed..");
         }catch(IOException e){
             e.printStackTrace();
@@ -123,7 +123,7 @@ public class SubNetwork extends Network {
     
     public void readInTrips(String fileName, double demandFactor){
         try(Scanner inputFile = new Scanner(new File(fileName))){
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >= 3)
                 System.out.println("Reading in-trips for subnetwork "+ networkName+"..");
             int origin_id = -1;
             while(inputFile.hasNext()){
@@ -155,7 +155,7 @@ public class SubNetwork extends Network {
                 }
             }
             inputFile.close();
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >= 3)
                 System.out.println("Completed..");
         }catch(IOException e){
             e.printStackTrace();
@@ -164,7 +164,7 @@ public class SubNetwork extends Network {
     
     public void readOutTrips(String fileName, double demandFactor){
         try(Scanner inputFile = new Scanner(new File(fileName))){
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >= 3)
                 System.out.println("Reading out-trips for subnetwork "+ networkName+"..");
             int origin_id = -1;
             while(inputFile.hasNext()){
@@ -212,7 +212,7 @@ public class SubNetwork extends Network {
                 }
             }
             inputFile.close();
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >= 3)
                 System.out.println("Completed..");
         }catch(IOException e){
             e.printStackTrace();
@@ -283,7 +283,7 @@ public class SubNetwork extends Network {
         if(!destInThisSubnetDueToOtherSubnet.contains(dest))
             destInThisSubnetDueToOtherSubnet.add(dest);
         
-        if("MEDIUM".equals(printVerbosityLevel))
+        if(this.printVerbosityLevel >= 3)
             System.out.println("Subnetwork "+this+" has following extraNodeLinks "+extraNodeLinks);
     }
     
@@ -506,16 +506,19 @@ public class SubNetwork extends Network {
         System.out.println(" Dests in this subnetwork due to other subnetworks = "+destInThisSubnetDueToOtherSubnet);
         
         int artifiODPairsNumber =0;
-        System.out.println("Artificial OD pairs");
-        for(Node origin: tripTable.getOrigins()){
-            for(ODPair od: tripTable.byOrigin(origin)){
-                if(od instanceof ArtificialODPair){
-                    System.out.print("\t"+od);
-                    artifiODPairsNumber++;
+        if(this.printVerbosityLevel>= 3){
+            System.out.println("Artificial OD pairs");
+            for(Node origin: tripTable.getOrigins()){
+                for(ODPair od: tripTable.byOrigin(origin)){
+                    if(od instanceof ArtificialODPair){
+                        System.out.print("\t"+od);
+                        artifiODPairsNumber++;
+                    }
                 }
             }
+            System.out.println("");
         }
-        System.out.println("");
+        
         System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
         
     }
@@ -524,6 +527,7 @@ public class SubNetwork extends Network {
     //--methods for doing bush-based sensitivity---//
     //=============================================//
     public void updateArtificialLinks(boolean costFunc, double gap){
+        System.out.println("Updating artificial link parameters");
         for (Node origin : this.tripTable.getArtificialODPairs().keySet()){
             boolean shortestPathExists = false;
             for(Node dest: this.tripTable.getArtificialODPairs().get(origin).keySet()){
@@ -567,15 +571,16 @@ public class SubNetwork extends Network {
                     System.out.println("aLinkFFTT="+aLinkFFTT+" where t_0="+t_0+", t_p="+t_p+" and d_0="+d_0);
                     System.exit(1);
                 }
-                
-//                System.out.println("Alink being updated="+aLink);
-//                System.out.println("--New TT function="+aLinkFFTT+"(1+"+aLinkCoef+"x), where the demand using the aLink="+d_0);
+                if(printVerbosityLevel>=4){
+                    System.out.println("Alink being updated="+aLink);
+                    System.out.println("--New TT function="+aLinkFFTT+"(1+"+aLinkCoef+"x), where the demand using the aLink="+d_0);
+                }
                 aLink.setFftime(aLinkFFTT);
                 aLink.setCoef(aLinkCoef);
             }
         }
 
-        if (this.printVerbosityLevel.equals("MEDIUM"))
+        if (this.printVerbosityLevel >=1)
             System.out.println("Subnetwork "+this+" sensitivity analysis completed");
     }
     
@@ -617,6 +622,9 @@ public class SubNetwork extends Network {
                     costDiff = stem.getCostDiffBetLongestAndShortestPaths(true);
                     isBushSensitivityConverged = (costDiff<gap);
 //                                isODConverged = true; //Forcing one iteration of Netwon's method for flow shifting.
+                    if(odCounter>500){
+                        System.out.println("..already "+odCounter+" iterations for solving bush sensitivty for stem"+stem);
+                    }
                 }
                 stem.updateTimeDerivative();
                 break;

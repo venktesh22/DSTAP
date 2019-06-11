@@ -17,8 +17,8 @@ public class DSTAPHeuristic extends DSTAPOptimizer{
         super();
     }
     
-    public DSTAPHeuristic(String printVerbosityLevel, Boolean runSubnetsInParallel, double demandFactor){
-        super(printVerbosityLevel, runSubnetsInParallel, demandFactor);
+    public DSTAPHeuristic(String printVerbosityLevel, Boolean runSubnetsInParallel){
+        super(printVerbosityLevel, runSubnetsInParallel);
     }
 
     @Override
@@ -29,6 +29,9 @@ public class DSTAPHeuristic extends DSTAPOptimizer{
         }
         for(SubNetwork s: subNets)
             s.createMasterNetArtificialLinksAndItsODPair();
+        if(this.printVerbosityLevel>=3){
+            System.out.println("All artificial links and OD pairs created.");
+        }
     }
     
     

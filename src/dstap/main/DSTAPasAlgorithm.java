@@ -13,8 +13,8 @@ import dstap.network.SubNetwork;
  */
 public class DSTAPasAlgorithm extends DSTAPOptimizer{
     
-    public DSTAPasAlgorithm(String printVerbosityLevel, Boolean runSubnetsInParallel, double demandFactor){
-        super(printVerbosityLevel, runSubnetsInParallel, demandFactor);
+    public DSTAPasAlgorithm(String printVerbosityLevel, Boolean runSubnetsInParallel){
+        super(printVerbosityLevel, runSubnetsInParallel);
     }
     
     @Override

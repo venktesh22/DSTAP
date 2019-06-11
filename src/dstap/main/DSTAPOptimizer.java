@@ -9,7 +9,10 @@ import dstap.links.Link;
 import dstap.network.*;
 import dstap.nodes.Node;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -30,29 +33,60 @@ public abstract class DSTAPOptimizer {
     protected FullNetwork fullNet;
     protected List<SubNetwork> subNets;
     
-    protected String printVerbosityLevel; //LEAST, LOW, MEDIUM, HIGH
+    protected int printVerbosityLevel; //LEAST=1, LOW=2, MEDIUM=3, HIGH=4
     protected Boolean runSubnetsInParallel; //or false
-    protected double demandFactor;
+    
+    protected String outputFolderName;
+    
+    protected  double INITIALMASTERGAP;
+    protected  double INITIAL_MASTER_OD_GAP;
+    protected  double INITIAL_MASTER_GAP_RATE;
+    protected  double INITIALSUBNETGAP;
+    protected  double INITIAL_SUBNET_OD_GAP;
+    protected  double INITIAL_SUBNET_GAP_RATE;
+    protected double DESIRED_FULLNET_GAP;
+    protected int MAX_OUTER_ITERATIONS;
+    protected  double DEMAND_FACTOR;
+    
 
     public DSTAPOptimizer() {
-        this("LEAST",false,1.0);        
+        this("LEAST",false);        
     }
 
-    public DSTAPOptimizer(String printVerbosityLevel, Boolean runSubnetsInParallel, double demandFactor) {
-        this.printVerbosityLevel = printVerbosityLevel;
+    public DSTAPOptimizer(String printVerbosityLevel, Boolean runSubnetsInParallel) {
+        switch(printVerbosityLevel){
+            case "LEAST":
+                this.printVerbosityLevel = 1;
+                break;
+            case "LESS":
+                this.printVerbosityLevel = 2;
+                break;
+            case "MEDIUM":
+                this.printVerbosityLevel = 3;
+                break;
+            case "HIGH":
+                this.printVerbosityLevel = 4;
+                break;
+            default:
+                this.printVerbosityLevel = 2;
+                break;
+        }
         this.runSubnetsInParallel = runSubnetsInParallel;
-        this.demandFactor = demandFactor;
+        //this.D = demandFactor;
         subnetworkNames = new ArrayList<>();
         subNets = new ArrayList<>();
     }
+    
     //=============================================//
     //======Functions for reading files============//
     //=============================================//
     
     public void readInputsAndInitialize(String folderName){
+        readParametersFile(folderName+"/Inputs/");
         readSubnetNames(folderName+"/Inputs/");
         initAndRelateAllNetworks();
         readAllNetworkInputFiles(folderName+"/Inputs/");
+        
         copyToFullNetwork();
         updateNodeList();
         generateArtificialLinksAndODPairs();
@@ -60,16 +94,76 @@ public abstract class DSTAPOptimizer {
         fullNet.createODPairMappings();
         printNetworkReadingStatistics();
         createODstems();
+        
+        createOutputDirectory(folderName);
     }
     
     private void readSubnetNames(String folderName){
         try{
             Scanner fileIn= new Scanner(new File(folderName+"subnetNames.txt"));
+            if(this.printVerbosityLevel>=4)
+                System.out.print("Reading subnetwork names:");
             while(fileIn.hasNext()){
                 String netName= fileIn.next();
                 subnetworkNames.add(netName);
             }
             fileIn.close();
+            if(this.printVerbosityLevel>=4)
+                System.out.print("Done.\n");
+        }catch(IOException e){
+            e.printStackTrace();
+            return;
+        }
+    }
+    
+    /**
+     * reads the parameters like OD gap etc 
+     * @param folderName 
+     */
+    private void readParametersFile(String folderName){
+        try{
+            Scanner fileIn= new Scanner(new File(folderName+"Parameters.txt"));
+            if(this.printVerbosityLevel>=3)
+                System.out.print("Reading simulation parameters:");
+            
+            while(fileIn.hasNext()){
+                String parameterName= fileIn.next();
+                switch(parameterName){
+                    case "initialMasterGap":
+                        this.INITIALMASTERGAP = Double.parseDouble(fileIn.next());
+                        break;
+                    case "intialMasterODGap":
+                        this.INITIAL_MASTER_OD_GAP = Double.parseDouble(fileIn.next());
+                        break;
+                    case "initialMasterGapRate":
+                        this.INITIAL_MASTER_GAP_RATE = Double.parseDouble(fileIn.next());
+                        break;
+                    case "initialSubNetGap":
+                        this.INITIALSUBNETGAP = Double.parseDouble(fileIn.next());
+                        break;
+                    case "intialSubNetODGap":
+                        this.INITIAL_SUBNET_OD_GAP = Double.parseDouble(fileIn.next());
+                        break;
+                    case "intialSubNetGapRate":
+                        this.INITIAL_SUBNET_GAP_RATE = Double.parseDouble(fileIn.next());
+                        break;    
+                    case "desiredFullNetGap":
+                        this.DESIRED_FULLNET_GAP = Double.parseDouble(fileIn.next());
+                        break;
+                    case "maxIterations":
+                        this.MAX_OUTER_ITERATIONS = Integer.parseInt(fileIn.next());
+                        break;
+                    case "demandFactor":
+                        this.DEMAND_FACTOR = Double.parseDouble(fileIn.next());
+                        break;
+                    default:
+                        break;
+                }
+            }
+            fileIn.close();
+            if(this.printVerbosityLevel>=3){
+                System.out.print("Done. \n");
+            }
         }catch(IOException e){
             e.printStackTrace();
             return;
@@ -103,12 +197,15 @@ public abstract class DSTAPOptimizer {
     protected void readAllNetworkInputFiles(String folderName){
         masterNet.readNetwork(folderName+"regionalLinks.txt");
         for(SubNetwork s: subNets){
-            s.readInTrips(folderName+s.networkName+"In_Trips.txt", demandFactor);
+            s.readInTrips(folderName+s.networkName+"In_Trips.txt", this.DEMAND_FACTOR);
             s.readNetwork(folderName+s.networkName+"_net.txt");
         }
         //we need to read network file for all subnetworks before we read OutTrips for all
         for(SubNetwork s:subNets){
-            s.readOutTrips(folderName+s.networkName+"Out_Trips.txt", demandFactor);
+            s.readOutTrips(folderName+s.networkName+"Out_Trips.txt", this.DEMAND_FACTOR);
+        }
+        if(this.printVerbosityLevel>=1){
+            System.out.println("All network input files read");
         }
     }
     
@@ -142,6 +239,29 @@ public abstract class DSTAPOptimizer {
             s.createODStems();
         fullNet.createODStems();
     }
+    /**
+     * Creates a subdirectory with a new name obtained from local computer's 
+     * @param folderName 
+     */
+    protected void createOutputDirectory(String folderName){
+        String epoch= Integer.toString((int)(System.currentTimeMillis()/1000.0));
+        File dir = new File(folderName+"/Outputs/"+epoch);
+    
+        // attempt to create the directory here
+        boolean successful = dir.mkdir();
+        if (!successful){
+            System.out.println("failed trying to create the directory");
+        }
+        this.outputFolderName= folderName+"/Outputs/"+epoch+"/";
+        
+        File source = new File(folderName+"/Inputs/Parameters.txt");
+        File dest = new File(this.outputFolderName+"Parameters.txt");
+        try {
+            Files.copy(source.toPath(), dest.toPath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
     
     //=============================================//
     //======Functions for solving DSTAP============//
@@ -153,18 +273,18 @@ public abstract class DSTAPOptimizer {
         //(below) tracks if the optimizer has converged. Convergence criteria can be multi-faceted
         boolean hasConverged = false;
         
-        double masterGap = 0.0001, masterODGap = 0.1, masterGapRate = 0.9;
-        double subNetGap = 0.001, subNetODGap = 0.1, subNetGapRate = 0.2;
+        double masterGap = this.INITIALMASTERGAP, masterODGap = this.INITIAL_MASTER_OD_GAP, masterGapRate = this.INITIAL_MASTER_GAP_RATE;
+        double subNetGap = this.INITIALSUBNETGAP, subNetODGap = this.INITIAL_SUBNET_OD_GAP, subNetGapRate = this.INITIAL_SUBNET_GAP_RATE;
         //@todo for now ignoring the changes in rate based on new and old fullNetworkGap
         
         int itrNo = 0;
         
         while(!hasConverged){
-            
+            System.out.println("\n------------Starting Iteration No. "+itrNo+"---------------\n");
             masterGap = masterGapRate * masterGap;
-            masterODGap = Math.max(masterGap, 0.001);
+            masterODGap = Math.max(masterODGap*masterGap, 0.001);
 
-            System.out.println("\n--Solving Master network in iteration: "+itrNo +" to a gap of "+masterGap);
+//            System.out.println("\n--Solving Master network in iteration: "+itrNo +" to a gap of "+masterGap);
             masterNet.solver(masterGap, masterODGap, itrNo);
             
             //function for updating subnetwork demand using masterNet artificial link flows
@@ -172,7 +292,7 @@ public abstract class DSTAPOptimizer {
             
             //function for solving each subnetwork in parallel
             subNetGap = subNetGapRate * subNetGap;
-            subNetODGap = Math.max(subNetGap, 0.001);
+            subNetODGap = Math.max(subNetODGap*subNetGapRate, 0.001);
             if(this.runSubnetsInParallel){
                 double startTimeSubnetEval = System.currentTimeMillis();
                 //got the information for parallelization from http://www.vogella.com/tutorials/JavaConcurrency/article.html
@@ -188,8 +308,7 @@ public abstract class DSTAPOptimizer {
 
             }
             else{
-                for (SubNetwork subNet : subNets)
-                {
+                for (SubNetwork subNet : subNets){
                     double startTimeSubnetEval = System.currentTimeMillis();
                     subNet.solver(subNetGap, subNetODGap, itrNo);
                     subNet.updateArtificialLinks(false, 1E-5);
@@ -200,19 +319,85 @@ public abstract class DSTAPOptimizer {
             double startTForMappingFlows= System.currentTimeMillis();
             fullNet.mapDSTAPnetFlowToFullNet();
             System.out.println("Time to map DSTAP flows to master and subnets:"+(System.currentTimeMillis()-startTForMappingFlows) + " milliseconds");
-            double fullNetGap = fullNet.getFullNetGap();
+            double fullNetGap = fullNet.getFullNetGapAndUpdateExcessCosts();
             
             
-//            startTForMappingFlows= System.currentTimeMillis();
-//            #fullNet.getExcessCosts();
-//            fullNetGapValues.add(newFullGap);
-//            System.out.println("Time to get excess costs:"+(System.currentTimeMillis()-startTForMappingFlows) + " milliseconds");
             System.out.println("\n\n=======Actual gap on full net is " + fullNetGap+"======\n");
             
             //
             itrNo++;
-            if(itrNo>30)
-                hasConverged = true; //for debug phase. Remove after code is done
+            if(fullNetGap< this.DESIRED_FULLNET_GAP || itrNo > this.MAX_OUTER_ITERATIONS)
+                hasConverged=true;
+//            if(itrNo>30)
+//                hasConverged = true; //for debug phase. Remove after code is done
+        }
+        this.printExcessCostsAndGaps();
+        try{
+        fullNet.printFull_LinkFlows(outputFolderName);
+        fullNet.printFull_TTs(outputFolderName);
+        }catch(Exception e){
+            e.printStackTrace();
+            return;
+        }
+    }
+    
+    private void printExcessCostsAndGaps(){
+//        System.out.println("\n\nItrNo\tMasterGap\tFullNetGap\tMasterMEC\tMasterAEC\tFullNetMEC\tFullNetAEC");
+//        for(int i=0;i< itrNo; i++){
+//            System.out.println((i+1)+"\t"+masterNet.gapValues.get(i)+"\t"+
+//                    fullNet.gapValues.get(i)+"\t"+
+//                    masterNet.excessCosts.get(i)+"\t"+
+//                    masterNet.avgExcessCosts.get(i)+"\t"+
+//                    fullNet.excessCosts.get(i)+"\t"+
+//                    fullNet.avgExcessCosts.get(i));
+//        }
+        
+        try{
+            PrintWriter fileOut = new PrintWriter(new File(this.outputFolderName+"excessCosts.txt"));
+            fileOut.print("iteration \t master_max \t master_avg \t");
+            for(SubNetwork s: subNets)
+                fileOut.print(s.networkName+"_max \t "+s.networkName+"_avg \t");
+            fileOut.print("full_max \t full_avg\n");
+
+            int count = masterNet.excessCosts.size(); //all of those have identical counts
+            for (int i = 0; i < count; i++){
+                fileOut.print(i+"\t"+masterNet.excessCosts.get(i)+"\t"+masterNet.avgExcessCosts.get(i)+"\t");
+                for(SubNetwork s: this.subNets)
+                    fileOut.print(s.excessCosts.get(i)+"\t"+s.avgExcessCosts.get(i)+"\t");
+                fileOut.print(fullNet.excessCosts.get(i)+"\t"+fullNet.avgExcessCosts.get(i)+"\n");
+    //                    "\t"++nNet.excessCosts.get(i)+"\t"+nNet.avgExcessCosts.get(i)+
+    //                    "\t"+fullNet.excessCosts.get(i)+"\t"+fullNet.avgExcessCosts.get(i));
+
+            }
+            fileOut.flush();
+            fileOut.close();
+        }catch(IOException e){
+            e.printStackTrace();
+            return;
+        }
+        
+        try{
+            PrintWriter fileOut = new PrintWriter(new File(this.outputFolderName+"gapValues.txt"));
+            fileOut.print("iteration \t master_gap \t");
+            for(SubNetwork s: subNets)
+                fileOut.print(s.networkName+"_gap \t");
+            fileOut.print("full_gap\n");
+
+            int count = masterNet.gapValues.size(); //all of those have identical counts
+            for (int i = 0; i < count; i++){
+                fileOut.print(i+"\t"+masterNet.gapValues.get(i)+"\t");
+                for(SubNetwork s: this.subNets)
+                    fileOut.print(s.gapValues.get(i)+"\t");
+                fileOut.print(fullNet.gapValues.get(i)+"\n");
+    //                    "\t"++nNet.excessCosts.get(i)+"\t"+nNet.avgExcessCosts.get(i)+
+    //                    "\t"+fullNet.excessCosts.get(i)+"\t"+fullNet.avgExcessCosts.get(i));
+
+            }
+            fileOut.flush();
+            fileOut.close();
+        }catch(IOException e){
+            e.printStackTrace();
+            return;
         }
     }
 }

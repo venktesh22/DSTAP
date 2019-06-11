@@ -30,21 +30,21 @@ abstract class Network {
     protected TripTable tripTable;
     
     public String networkName;
-    protected String printVerbosityLevel;
+    protected int printVerbosityLevel;
     
     //gap calculation variables
     protected double TSTT; //total system travel time
     protected double SPTT; //shortest path travel time (TSTT when all vehicles go on shortest path assuming constant costs)
     protected double initialGap;
-    protected List<Double> gapValues;
-    protected List<Double> excessCosts;
-    protected List<Double> avgExcessCosts;
+    public List<Double> gapValues; //stores the gap values at end of each iteration (after end of solver)
+    public List<Double> excessCosts; //stores the maxExcessCost at end of each itr
+    public List<Double> avgExcessCosts; //stores the avgExcessCost at end of each itr
     
     public Network(){
-        this("LEAST");
+        this(1);
     }
     
-    public Network(String verbosityLevel){
+    public Network(int verbosityLevel){
         printVerbosityLevel = verbosityLevel;
         links = new HashSet<>();
         physicalLinks = new HashSet<>();
@@ -122,9 +122,9 @@ abstract class Network {
                 }
             }
         }
-        else{
-            System.out.println("Origin "+origin+" not found");
-        }
+//        else{
+//            System.out.println("Origin "+origin+" not found");
+//        }
 //        System.out.println(" Cumulated SPTT value = "+SPTT);
     }
     
@@ -174,7 +174,9 @@ abstract class Network {
         System.out.println("\n=== Network "+networkName+" has following statistics=====");
         System.out.println(" No of nodes = "+nodes.size());
         System.out.println(" No of links = "+links.size());
-        System.out.println("  and the Links are: \n"+links);
+        if(this.printVerbosityLevel>=3){
+            System.out.println("  and the Links are: \n"+links);
+        }
         System.out.println(" No of physical links = "+physicalLinks.size());
         System.out.println(" No. of origins = "+ tripTable.getOrigins().size());
         
@@ -184,7 +186,8 @@ abstract class Network {
             for(ODPair od: tripTable.byOrigin(origin)){
                 demand+= od.getDemand();
                 odPairsNumber++;
-                System.out.println("---OD pair "+od+" has demand="+od.getDemand()+" and "+ ((od instanceof ArtificialODPair)?"Artificial":"Regular"));
+                if(this.printVerbosityLevel>=3)
+                    System.out.println("---OD pair "+od+" has demand="+od.getDemand()+" and "+ ((od instanceof ArtificialODPair)?"Artificial":"Regular"));
             }
         }
         System.out.println(" No of OD pairs = "+ odPairsNumber);
@@ -213,7 +216,7 @@ abstract class Network {
      * @todo: also include other variables like whether or not to store gaps, excess cost values, Beckmann function value etc.
      */
     public void solver(double gap, double odGap, int itrNo){
-        if("MEDIUM".equals(printVerbosityLevel)){
+        if(this.printVerbosityLevel >=1){
             System.out.println("Solving network "+this.networkName);
         }
         boolean converged = false;
@@ -225,11 +228,14 @@ abstract class Network {
             for(Node origin : this.tripTable.getOrigins())
                 dijkstras(origin); //updates SPTT
             this.initialGap = getGap();
-            this.gapValues.add(initialGap);
-            System.out.println("Initial gap of\t"+initialGap+"\t for \t"+networkName);
+//            this.gapValues.add(initialGap);
+            System.out.println(this.networkName+" initial gap =\t"+initialGap);
 //            if(this.initialGap<gap){ //commented: read point below
 //                converged = true;
 //            }
+        }
+        if(this.printVerbosityLevel >=2){
+            System.out.println("Subiteration\tGap for "+this.networkName);
         }
         //regardless of if the first subitr gap< desired gap we run one iteration at least
         //this is because suppose an OD pair which had zero demand earlier now has a demand
@@ -293,8 +299,8 @@ abstract class Network {
             double gapAtBeginningOfThisSubItr = getGap(beforeTSTT); //we have to get gap at end only because SPTT is updated only after solving all origin dijkstra
             if(gapAtBeginningOfThisSubItr<gap || subItrNo>500)
                 converged = true;
-            if("LEAST".equals(printVerbosityLevel)){
-                System.out.println("Network "+this.networkName+" subiteration "+subItrNo+" has gap value of "+gapAtBeginningOfThisSubItr);
+            if(this.printVerbosityLevel >=2){
+                System.out.println(subItrNo+"\t"+gapAtBeginningOfThisSubItr);
             }
             subItrNo++;
             
@@ -321,9 +327,43 @@ abstract class Network {
             dijkstras(origin); //updates SPTT
         double finalGap = getGap();
         this.gapValues.add(finalGap);
-        if("LEAST".equals(printVerbosityLevel)){
-            System.out.println("Network "+this.networkName+" subiteration "+subItrNo+" has FINAL gap value of "+finalGap);
+        this.updateExcessCosts();
+        if(printVerbosityLevel>=1){
+            System.out.println("Solver ended in "+subItrNo+" subiterations.");
+            System.out.println("Final gap= "+finalGap+", Max Excess Cost= "+this.excessCosts.get(excessCosts.size()-1)
+            +", and AEC= "+this.avgExcessCosts.get(avgExcessCosts.size()-1));
         }
+    }
+    
+    /**
+     * Updates max and avg access costs. Relies on the fact that dijkstra already
+     * found a shortest path for the network. We only find excess costs at end of the
+     * solver so dijkstra has been run once before. For fullNetwork where we
+     * do not run a dijkstra to update the gap, make sure to run Dijkstra explicitly
+     */
+    public void updateExcessCosts(){
+        double maxExCost = -1000.0;
+        double avgExCost = 0.0;
+        int count = 0;
+
+        for (Node origin: this.tripTable.getOrigins()){
+            for(ODPair od : this.tripTable.byOrigin(origin)){
+                if (od.getStem().getPathSet().size() > 0){
+                    double minCost = od.getStem().getShortestPathCost();
+                    for (Path p : od.getStem().getPathSet()){
+                        double ec = p.getCost() - minCost;
+                        avgExCost += ec;
+                        count++;
+                        if (ec > maxExCost){
+                            maxExCost = ec;
+                        }
+                    }
+                }
+            }
+        }
+        avgExCost = avgExCost/count;
+        excessCosts.add(maxExCost);
+        avgExcessCosts.add(avgExCost);
     }
     
     protected double getGap(){
@@ -349,11 +389,12 @@ abstract class Network {
             //demand not loaded yet
             return 1.0;
         }
-        if(getSPTT()> prevTSTT){
+        if(getSPTT()- prevTSTT >1e-8){
             System.out.println("SPTT="+getSPTT()+" while TSTT="+prevTSTT+" causing negative gap. Exiting!");
             System.exit(1);
         }
-        return ( 1 - (getSPTT()/prevTSTT) );
+        double g=(1 - (getSPTT()/prevTSTT));
+        return g;
     }
     
     protected void updateTSTT(){
@@ -412,6 +453,14 @@ abstract class Network {
                     System.out.println("OD "+od+" has path="+p+" with flow="+p.getFlow()+" and cost="+p.getCost());
                 }
             }
+        }
+        System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+    }
+    
+    public void printAllLinkFlows(){
+        System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+        for(Link l: links){
+            System.out.println("Link "+l+" has flow of "+l.getFlow()+" and travel time is "+l.getTravelTime()+" with coef="+l.getCoef()+" and fftt="+l.getFFTime());
         }
         System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~");
     }

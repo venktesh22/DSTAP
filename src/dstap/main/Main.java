@@ -21,19 +21,17 @@ public class Main {
         //===============================================//
         //================Input variables================//
         //===============================================//
-        //@todo: move following elements as part of the args to the main function
-//        String folderName = "Networks/Grid_2/";
-//        String folderName = "Networks/Grid/";
-        String folderName = "Networks/DoubleSiouxFalls/";
-        String printVerbosityLevel = "LOW"; //LEAST, LOW, MEDIUM, HIGH
-        Boolean runSubnetsInParallel = false; //or false
-        double demandFactor = 1.0; // 0.5 means 50% demand and likewise
+        String folderName = "Networks/"+args[0]+"/";
+        
+        String printVerbosityLevel = args[1]; //LEAST, LOW, MEDIUM, HIGH
+        
+        Boolean runSubnetsInParallel = Boolean.getBoolean(args[2]); //or false
         
 //        DSTAPasAlgorithm optimizer = new DSTAPasAlgorithm(printVerbosityLevel, 
 //                runSubnetsInParallel, demandFactor);
         
         DSTAPHeuristic optimizer = new DSTAPHeuristic(printVerbosityLevel, 
-                runSubnetsInParallel, demandFactor);
+                runSubnetsInParallel);
         
         // We assume inputs are in the format where all subnetwork trips completely
         //within the subnetwork are in separate file than the trips from one

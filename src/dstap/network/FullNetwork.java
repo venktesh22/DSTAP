@@ -5,11 +5,15 @@
  */
 package dstap.network;
 
+import dstap.ODs.ArtificialODPair;
 import dstap.ODs.ODPair;
 import dstap.ODs.Path;
 import dstap.links.ArtificialLink;
 import dstap.links.Link;
 import dstap.nodes.Node;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +35,7 @@ public class FullNetwork extends Network{
     public Map<ODPair, ODPair> subnetODToFullnetOD;
     public Map<ODPair, ODPair> masternetODToFullnetOD;
     
-    public FullNetwork(MasterNetwork master, List<SubNetwork> subNets, String name, String verbosity){
+    public FullNetwork(MasterNetwork master, List<SubNetwork> subNets, String name, int verbosity){
         super(verbosity);
         subNetworks = new HashSet<>();
         
@@ -359,25 +363,89 @@ public class FullNetwork extends Network{
     
     public void printFullNetworkStatistics(){
         this.printNetworkStatistics();
-        System.out.println("Mapping of otherNets link to full net links\n");
-        for(Link l:this.otherNetLinkToFullLink.keySet()){
-            System.out.println(l+"-->"+this.otherNetLinkToFullLink.get(l));
-        }
-        System.out.println("Mapping of subnetODs to fullnet ODs");
-        for(ODPair sOD: subnetODToFullnetOD.keySet()){
-            System.out.println(sOD+"-->"+subnetODToFullnetOD.get(sOD));
-        }
-        System.out.println("Mapping of masternetODs to fullnet ODs");
-        for(ODPair mOD: masternetODToFullnetOD.keySet()){
-            System.out.println(mOD+"-->"+masternetODToFullnetOD.get(mOD));
+        if(this.printVerbosityLevel>=3){
+            System.out.println("Mapping of otherNets link to full net links\n");
+            for(Link l:this.otherNetLinkToFullLink.keySet()){
+                System.out.println(l+"-->"+this.otherNetLinkToFullLink.get(l));
+            }
+            System.out.println("Mapping of subnetODs to fullnet ODs");
+            for(ODPair sOD: subnetODToFullnetOD.keySet()){
+                System.out.println(sOD+"-->"+subnetODToFullnetOD.get(sOD));
+            }
+            System.out.println("Mapping of masternetODs to fullnet ODs");
+            for(ODPair mOD: masternetODToFullnetOD.keySet()){
+                System.out.println(mOD+"-->"+masternetODToFullnetOD.get(mOD));
+            }
         }
     }
     
-    public double getFullNetGap(){
+    public double getFullNetGapAndUpdateExcessCosts(){
         this.setSPTT(0.0);
         resetLinkPrevItrFlows();
         for(Node origin : this.tripTable.getOrigins())
             dijkstras(origin); //updates SPTT
-        return this.getGap();
+        //we do not run trace algorithm again.
+        //@todo: this may be a flaw. What if the full network doesn't
+        //already have that path and maxExcessCosts are updated incorrectly in
+        //that case?
+        this.updateExcessCosts();
+        double gap= this.getGap();
+        this.gapValues.add(gap);
+        return gap;
+    }
+    
+    public void printFull_TTs(String folderName){
+        try{
+            PrintWriter fileOut = new PrintWriter(new File(folderName+"DSTAP_fullNetwork_ODtravelTime.txt"));
+            fileOut.println("ODtype\tOrigin\tDestination\tDemand\tCost");
+            for(Node origin : this.tripTable.getOrigins()){
+                for(ODPair od : this.tripTable.byOrigin(origin)){
+                    if(!(od instanceof ArtificialODPair))
+                        fileOut.println("Regular\t"+origin.getId()+"\t"+od.getDest().getId()+"\t"+od.getDemand()+"\t"+od.getODCostAtUE());
+                    else
+                        fileOut.println("Artificial\t"+origin.getId()+"\t"+od.getDest().getId()+"\t"+od.getDemand()+"\t"+od.getODCostAtUE());
+                }
+            }
+            fileOut.flush();
+            fileOut.close();
+        }catch(IOException e){
+            e.printStackTrace();
+            return;
+        }catch(RuntimeException e){
+            e.printStackTrace();
+            return;
+        }
+        
+    }
+    
+    /**
+     * print the link flows on the full network
+     * @throws IOException
+     */
+    public void printFull_LinkFlows(String folderName){
+        try{
+            PrintWriter fileOut = new PrintWriter(new File(folderName+"DSTAP_fullNetwork_linkFlows.txt"));
+            fileOut.println("source \t destination \t fft \t flow \t cost(min)");
+            for(Link l : links){
+                fileOut.println(l.getSource().getId()+"\t"+l.getDest().getId()+"\t"+l.getFFTime()+"\t"+l.getFlow()+"\t"+l.getTravelTime());
+            }
+            fileOut.flush();
+            fileOut.close();
+
+            fileOut = new PrintWriter(new File(folderName+"DSTAP_boundary_linkFlows.txt"));
+            fileOut.println("source \t destination \t fft \t flow \t cost(min)");
+            for(Link l : boundaryLinks){
+                fileOut.println(l.getSource().getId()+"\t"+l.getDest().getId()+"\t"+l.getFFTime()+"\t"+l.getFlow()+"\t"+l.getTravelTime());
+            }
+            fileOut.flush();
+            fileOut.close();
+        }
+        catch(IOException e){
+            e.printStackTrace();
+            return;
+        }catch(RuntimeException e){
+            e.printStackTrace();
+            return;
+        }
     }
 }

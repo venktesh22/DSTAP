@@ -33,7 +33,7 @@ public class MasterNetwork extends Network{
     link class has an associated OD pair on its own
      */
     
-    public MasterNetwork(String verbosityLevel, String name){
+    public MasterNetwork(int verbosityLevel, String name){
         super(verbosityLevel);
         networkName = name;
         boundaryNodesByID = new HashMap<>();
@@ -51,7 +51,7 @@ public class MasterNetwork extends Network{
      */
     public void readNetwork(String fileName){
         try (Scanner inputFile = new Scanner(new File(fileName))){
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel>=3)
                 System.out.println("Reading master network..");
             inputFile.nextLine();//skip the header line
 
@@ -82,7 +82,7 @@ public class MasterNetwork extends Network{
                 links.add(l);
                 physicalLinks.add(l);
             }
-            if("MEDIUM".equals(printVerbosityLevel))
+            if(this.printVerbosityLevel >=3)
                 System.out.println("Master network reading complete..");
         }catch(IOException e){
             e.printStackTrace();
@@ -168,7 +168,7 @@ public class MasterNetwork extends Network{
      * This function updates the demand of the subnetwork OD pair using flow on artificial links
      */
     public void updateSubnetODsDemand(){
-        if("MEDIUM".equals(this.printVerbosityLevel)){
+        if(this.printVerbosityLevel >= 1.0){
             System.out.println("Updating demand for subnetwork ODs corresponding to master artificial links");
         }
         for(ArtificialLink l: this.artificialLinks){
@@ -184,11 +184,13 @@ public class MasterNetwork extends Network{
         System.out.println(" Artificial Links = "+artificialLinks);
         
         int artifiODPairsNumber =0;
-        System.out.println("Artificial OD pairs");
+        if(this.printVerbosityLevel>=3)
+            System.out.println("Artificial OD pairs");
         for(Node origin: tripTable.getOrigins()){
             for(ODPair od: tripTable.byOrigin(origin)){
                 if(od instanceof ArtificialODPair){
-                    System.out.print("\t"+od);
+                    if(this.printVerbosityLevel>=3)
+                        System.out.print("\t"+od);
                     artifiODPairsNumber++;
                 }
             }

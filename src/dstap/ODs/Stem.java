@@ -120,6 +120,11 @@ public class Stem {
         longestPath = p;
     }
     
+    public double getShortestPathCost(){
+        setShortestPath();
+        return getShortestPath().getCost();
+    }
+    
     public Path getShortestPath(){
         return getShortestPath(false);
     }
