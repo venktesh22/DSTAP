@@ -1,2 +1,0 @@
-subnet_0
-subnet_1

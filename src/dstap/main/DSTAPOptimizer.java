@@ -38,6 +38,8 @@ public abstract class DSTAPOptimizer {
     
     protected String outputFolderName;
     
+    protected Boolean writeOutputFiles;
+    
     protected  double INITIALMASTERGAP;
     protected  double INITIAL_MASTER_OD_GAP;
     protected  double INITIAL_MASTER_GAP_RATE;
@@ -75,17 +77,19 @@ public abstract class DSTAPOptimizer {
         //this.D = demandFactor;
         subnetworkNames = new ArrayList<>();
         subNets = new ArrayList<>();
+        //debug mode
+        writeOutputFiles = false;
     }
     
     //=============================================//
     //======Functions for reading files============//
     //=============================================//
     
-    public void readInputsAndInitialize(String folderName){
-        readParametersFile(folderName+"/Inputs/");
-        readSubnetNames(folderName+"/Inputs/");
+    public void readInputsAndInitialize(String folderName, String partitionSubFolder){
+        readParametersFile(folderName+"/Inputs/"+partitionSubFolder+"/");
+        readSubnetNames(folderName+"/Inputs/"+partitionSubFolder+"/");
         initAndRelateAllNetworks();
-        readAllNetworkInputFiles(folderName+"/Inputs/");
+        readAllNetworkInputFiles(folderName+"/Inputs/"+partitionSubFolder+"/");
         
         copyToFullNetwork();
         updateNodeList();
@@ -95,7 +99,8 @@ public abstract class DSTAPOptimizer {
         printNetworkReadingStatistics();
         createODstems();
         
-        createOutputDirectory(folderName);
+        if(writeOutputFiles)
+            createOutputDirectory(folderName, partitionSubFolder);
     }
     
     private void readSubnetNames(String folderName){
@@ -242,9 +247,11 @@ public abstract class DSTAPOptimizer {
     /**
      * Creates a subdirectory with a new name obtained from local computer's 
      * @param folderName 
+     * @param partitionSubFolder 
      */
-    protected void createOutputDirectory(String folderName){
+    protected void createOutputDirectory(String folderName, String partitionSubFolder){
         String epoch= Integer.toString((int)(System.currentTimeMillis()/1000.0));
+        epoch = partitionSubFolder+"_"+epoch;
         File dir = new File(folderName+"/Outputs/"+epoch);
     
         // attempt to create the directory here
@@ -254,7 +261,7 @@ public abstract class DSTAPOptimizer {
         }
         this.outputFolderName= folderName+"/Outputs/"+epoch+"/";
         
-        File source = new File(folderName+"/Inputs/Parameters.txt");
+        File source = new File(folderName+"/Inputs/"+partitionSubFolder+"/Parameters.txt");
         File dest = new File(this.outputFolderName+"Parameters.txt");
         try {
             Files.copy(source.toPath(), dest.toPath());
@@ -331,13 +338,15 @@ public abstract class DSTAPOptimizer {
 //            if(itrNo>30)
 //                hasConverged = true; //for debug phase. Remove after code is done
         }
-        this.printExcessCostsAndGaps();
-        try{
-        fullNet.printFull_LinkFlows(outputFolderName);
-        fullNet.printFull_TTs(outputFolderName);
-        }catch(Exception e){
-            e.printStackTrace();
-            return;
+        if(writeOutputFiles){
+            this.printExcessCostsAndGaps();
+            try{
+            fullNet.printFull_LinkFlows(outputFolderName);
+            fullNet.printFull_TTs(outputFolderName);
+            }catch(Exception e){
+                e.printStackTrace();
+                return;
+            }
         }
     }
     

@@ -179,9 +179,9 @@ public class MasterNetwork extends Network{
     
     public void printMasterNetworkStatistics(){
         printNetworkStatistics();
-        System.out.println(" Boundary Nodes = "+boundaryNodesByID.keySet());
+        System.out.println(" No. of boundary Nodes = "+boundaryNodesByID.keySet().size());
         System.out.println(" No of artificial links = "+artificialLinks.size());
-        System.out.println(" Artificial Links = "+artificialLinks);
+//        System.out.println(" Artificial Links = "+artificialLinks);
         
         int artifiODPairsNumber =0;
         if(this.printVerbosityLevel>=3)

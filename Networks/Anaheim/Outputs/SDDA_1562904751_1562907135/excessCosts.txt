@@ -1,0 +1,2 @@
+iteration 	 master_max 	 master_avg 	full_max 	 full_avg
+0	-1000.0	NaN	-1000.0	NaN

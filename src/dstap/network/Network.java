@@ -21,7 +21,7 @@ import java.util.Set;
  *
  * @author vp6258
  */
-abstract class Network {
+public abstract class Network {
     protected Set<Link> links;
     protected Set<Link> physicalLinks;
     
@@ -174,7 +174,7 @@ abstract class Network {
         System.out.println("\n=== Network "+networkName+" has following statistics=====");
         System.out.println(" No of nodes = "+nodes.size());
         System.out.println(" No of links = "+links.size());
-        if(this.printVerbosityLevel>=3){
+        if(this.printVerbosityLevel>=4){
             System.out.println("  and the Links are: \n"+links);
         }
         System.out.println(" No of physical links = "+physicalLinks.size());
@@ -186,7 +186,7 @@ abstract class Network {
             for(ODPair od: tripTable.byOrigin(origin)){
                 demand+= od.getDemand();
                 odPairsNumber++;
-                if(this.printVerbosityLevel>=3)
+                if(this.printVerbosityLevel>=4)
                     System.out.println("---OD pair "+od+" has demand="+od.getDemand()+" and "+ ((od instanceof ArtificialODPair)?"Artificial":"Regular"));
             }
         }
@@ -217,7 +217,7 @@ abstract class Network {
      */
     public void solver(double gap, double odGap, int itrNo){
         if(this.printVerbosityLevel >=1){
-            System.out.println("Solving network "+this.networkName);
+            System.out.println("Solving network "+this.networkName +" to a gap of "+gap+" or till 500 iterations of gradient projection");
         }
         boolean converged = false;
         //@todo: change the following statement about storing gap values to false if not needed
@@ -235,15 +235,17 @@ abstract class Network {
 //            }
         }
         if(this.printVerbosityLevel >=2){
-            System.out.println("Subiteration\tGap for "+this.networkName);
+            System.out.println("Subiteration\tGap for "+this.networkName+"\tTime taken this subitr(sec)");
         }
         //regardless of if the first subitr gap< desired gap we run one iteration at least
         //this is because suppose an OD pair which had zero demand earlier now has a demand
         //gap of previous network was solved with OD with zero demand, and initial gap which
         //is same as gap of previous mainItr will still satisfy that, but we still need to load
         //the demand onto the new paths
+        
         while(!converged){
 //            System.out.println("!!!!!!!!!!!!!!Starting subIteration "+subItrNo);
+            double time = System.currentTimeMillis();
             int count = 0;
             this.setSPTT(0.0); //everytime before running dijkstra for all origins we reset SPTT
             this.updateTSTT();
@@ -300,7 +302,7 @@ abstract class Network {
             if(gapAtBeginningOfThisSubItr<gap || subItrNo>500)
                 converged = true;
             if(this.printVerbosityLevel >=2){
-                System.out.println(subItrNo+"\t"+gapAtBeginningOfThisSubItr);
+                System.out.println(subItrNo+"\t"+gapAtBeginningOfThisSubItr+"\t"+((System.currentTimeMillis()-time)/1000.0));
             }
             subItrNo++;
             

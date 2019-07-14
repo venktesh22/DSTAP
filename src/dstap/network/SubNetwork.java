@@ -283,8 +283,8 @@ public class SubNetwork extends Network {
         if(!destInThisSubnetDueToOtherSubnet.contains(dest))
             destInThisSubnetDueToOtherSubnet.add(dest);
         
-        if(this.printVerbosityLevel >= 3)
-            System.out.println("Subnetwork "+this+" has following extraNodeLinks "+extraNodeLinks);
+//        if(this.printVerbosityLevel >= 3)
+//            System.out.println("Subnetwork "+this+" has following extraNodeLinks "+extraNodeLinks);
     }
     
     /**
@@ -496,14 +496,14 @@ public class SubNetwork extends Network {
     
     public void printSubNetworkStatistics(){
         printNetworkStatistics();
-        System.out.println(" Boundary Nodes = "+boundaryNodes);
-        System.out.println(" Extra Nodes = " + extraNodes);
-        System.out.println(" Extra Node Links = "+ extraNodeLinks);
-        System.out.println(" Artificial Links = "+artificialLinks);
-        System.out.println(" Origins in Master Net = "+originsInMasterNet);
-        System.out.println(" Dests in Master Net="+destsInMasterNet);
-        System.out.println(" Origins in this subnetwork due to other subnetworks = "+originsInThisSubnetDueToOtherSubnet);
-        System.out.println(" Dests in this subnetwork due to other subnetworks = "+destInThisSubnetDueToOtherSubnet);
+        System.out.println(" Boundary Nodes = "+boundaryNodes.size());
+        System.out.println(" Extra Nodes = " + extraNodes.size());
+        System.out.println(" Extra Node Links = "+ extraNodeLinks.size());
+        System.out.println(" Artificial Links = "+artificialLinks.size());
+        System.out.println(" Origins in Master Net = "+originsInMasterNet.size());
+        System.out.println(" Dests in Master Net="+destsInMasterNet.size());
+        System.out.println(" Origins in this subnetwork due to other subnetworks = "+originsInThisSubnetDueToOtherSubnet.size());
+        System.out.println(" Dests in this subnetwork due to other subnetworks = "+destInThisSubnetDueToOtherSubnet.size());
         
         int artifiODPairsNumber =0;
         if(this.printVerbosityLevel>= 3){
@@ -564,10 +564,10 @@ public class SubNetwork extends Network {
                 
                 double aLinkFFTT = t_0 - t_p * d_0;
                 double aLinkCoef=0;
-                if(t_p / (t_0 - t_p * d_0) != 0)
+                if(aLinkFFTT != 0)
                     aLinkCoef= t_p / (t_0 - t_p * d_0);
                 else{
-                    System.out.println("Artificial link ffTT is not set right. It cannot be zero or negative");
+                    System.out.println("Artificial link ffTT is not set right. It cannot be zero (as dividing by infinite not allowed)");
                     System.out.println("aLinkFFTT="+aLinkFFTT+" where t_0="+t_0+", t_p="+t_p+" and d_0="+d_0);
                     System.exit(1);
                 }

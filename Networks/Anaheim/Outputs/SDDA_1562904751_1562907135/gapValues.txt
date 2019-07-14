@@ -1,0 +1,2 @@
+iteration 	 master_gap 	full_gap
+0	1.0	1.0
