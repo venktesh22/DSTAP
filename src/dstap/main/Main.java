@@ -28,7 +28,7 @@ public class Main {
          */
         boolean runPartitioning = Boolean.parseBoolean(args[3]);
         String netName = args[0];
-        String subFolderName="SDDA_1562904751"; //subfolder inside INPUTS that contains the partition files...
+        String subFolderName="SDDA_1563150962"; //subfolder inside INPUTS that contains the partition files...
         if(runPartitioning){
             int noOfClusters=2;
             SDDAlgorithm algo = new SDDAlgorithm(2, netName);

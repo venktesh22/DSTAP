@@ -506,18 +506,19 @@ public class SubNetwork extends Network {
         System.out.println(" Dests in this subnetwork due to other subnetworks = "+destInThisSubnetDueToOtherSubnet.size());
         
         int artifiODPairsNumber =0;
-        if(this.printVerbosityLevel>= 3){
+        
             System.out.println("Artificial OD pairs");
             for(Node origin: tripTable.getOrigins()){
                 for(ODPair od: tripTable.byOrigin(origin)){
                     if(od instanceof ArtificialODPair){
+                        if(this.printVerbosityLevel>= 3){
                         System.out.print("\t"+od);
+                        }
                         artifiODPairsNumber++;
                     }
                 }
             }
             System.out.println("");
-        }
         
         System.out.println("Total no of artificial OD pairs = "+artifiODPairsNumber);
         

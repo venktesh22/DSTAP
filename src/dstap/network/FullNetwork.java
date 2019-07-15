@@ -363,7 +363,7 @@ public class FullNetwork extends Network{
     
     public void printFullNetworkStatistics(){
         this.printNetworkStatistics();
-        if(this.printVerbosityLevel>=3){
+        if(this.otherNetLinkToFullLink.keySet().size()<10 && this.printVerbosityLevel>=4){
             System.out.println("Mapping of otherNets link to full net links\n");
             for(Link l:this.otherNetLinkToFullLink.keySet()){
                 System.out.println(l+"-->"+this.otherNetLinkToFullLink.get(l));
