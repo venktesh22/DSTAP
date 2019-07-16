@@ -78,7 +78,7 @@ public abstract class DSTAPOptimizer {
         subnetworkNames = new ArrayList<>();
         subNets = new ArrayList<>();
         //debug mode
-        writeOutputFiles = false;
+        writeOutputFiles = true;
     }
     
     //=============================================//

@@ -24,7 +24,7 @@ public class DSTAPHeuristic extends DSTAPOptimizer{
     @Override
     public void generateArtificialLinksAndODPairs(){
         for(SubNetwork s: subNets){
-            s.generateOriginsAndDestDueToOtherSubnet();
+//            s.generateOriginsAndDestDueToOtherSubnet();
             s.updateNodeList();
         }
         for(SubNetwork s: subNets)

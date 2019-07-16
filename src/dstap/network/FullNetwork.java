@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Contains the complete network
+ * Contains the full network which is pieced together from the master and subnetworks used in DSTAP
  * @author vp6258
  */
 public class FullNetwork extends Network{

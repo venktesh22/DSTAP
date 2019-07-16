@@ -37,6 +37,7 @@ public abstract class Network {
     protected double SPTT; //shortest path travel time (TSTT when all vehicles go on shortest path assuming constant costs)
     protected double initialGap;
     public List<Double> gapValues; //stores the gap values at end of each iteration (after end of solver)
+    public List<Double> subIterationGapValues; //stores the gap values within the subiteration> reset to null at beginning of subiteration
     public List<Double> excessCosts; //stores the maxExcessCost at end of each itr
     public List<Double> avgExcessCosts; //stores the avgExcessCost at end of each itr
     
@@ -222,6 +223,7 @@ public abstract class Network {
         boolean converged = false;
         //@todo: change the following statement about storing gap values to false if not needed
         int subItrNo =0;
+        this.subIterationGapValues = new ArrayList<>();
         if(true){
             this.setSPTT(0.0);
             resetLinkPrevItrFlows();
@@ -299,6 +301,7 @@ public abstract class Network {
                 }//end of ODpair for loop
             }//end of looping through all origins
             double gapAtBeginningOfThisSubItr = getGap(beforeTSTT); //we have to get gap at end only because SPTT is updated only after solving all origin dijkstra
+            this.subIterationGapValues.add(gapAtBeginningOfThisSubItr);
             if(gapAtBeginningOfThisSubItr<gap || subItrNo>500)
                 converged = true;
             if(this.printVerbosityLevel >=2){
@@ -329,6 +332,7 @@ public abstract class Network {
             dijkstras(origin); //updates SPTT
         double finalGap = getGap();
         this.gapValues.add(finalGap);
+        this.subIterationGapValues.add(finalGap);
         this.updateExcessCosts();
         if(printVerbosityLevel>=1){
             System.out.println("Solver ended in "+subItrNo+" subiterations.");
