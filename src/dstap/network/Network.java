@@ -41,6 +41,8 @@ public abstract class Network {
     public List<Double> excessCosts; //stores the maxExcessCost at end of each itr
     public List<Double> avgExcessCosts; //stores the avgExcessCost at end of each itr
     
+    public List<Double> computationTimePerSubItr;
+    
     public Network(){
         this(1);
     }
@@ -106,8 +108,8 @@ public abstract class Network {
                 if(od.getStem()!=null){
                     if (od.getStem().getPathSet().size() > 0  && demand>0.0){
                         double value = demand*od.getDest().label;
-                        if(value< 1E-10){
-                            System.out.println("Negative value. Exiting.");
+                        if(value< 0){
+                            System.out.println("Negative value of Od dijkstra label. ODPair-"+od+". Exiting.");
                             System.exit(1);
                         }
 //                        System.out.println("OD "+od+" has demand="+ demand+" and dest.label()="+od.getDest().label + " and product of the two="+value);
@@ -151,7 +153,7 @@ public abstract class Network {
         }
         if(curr!=origin){
             System.out.println("Found shortest path does not terminate at origin. Fix the issue");
-            System.out.println("Origin:"+origin+", destination="+dest+", network"+this+", and path found from dest="+output);
+            System.out.println("Origin:"+origin+", destination="+dest+", network"+this);
             System.exit(1);
         }
         return output;
@@ -224,6 +226,8 @@ public abstract class Network {
         //@todo: change the following statement about storing gap values to false if not needed
         int subItrNo =0;
         this.subIterationGapValues = new ArrayList<>();
+        this.computationTimePerSubItr = new ArrayList<>();
+        
         if(true){
             this.setSPTT(0.0);
             resetLinkPrevItrFlows();
@@ -231,13 +235,14 @@ public abstract class Network {
                 dijkstras(origin); //updates SPTT
             this.initialGap = getGap();
 //            this.gapValues.add(initialGap);
-            System.out.println(this.networkName+" initial gap =\t"+initialGap);
+            if(this.printVerbosityLevel>=1)
+                System.out.println(this.networkName+" initial gap =\t"+initialGap);
 //            if(this.initialGap<gap){ //commented: read point below
 //                converged = true;
 //            }
         }
         if(this.printVerbosityLevel >=2){
-            System.out.println("Subiteration\tGap for "+this.networkName+"\tTime taken this subitr(sec)");
+            System.out.println("Network\tSubiteration\tGap for "+this.networkName+"\tTime taken this subitr(sec)");
         }
         //regardless of if the first subitr gap< desired gap we run one iteration at least
         //this is because suppose an OD pair which had zero demand earlier now has a demand
@@ -304,8 +309,9 @@ public abstract class Network {
             this.subIterationGapValues.add(gapAtBeginningOfThisSubItr);
             if(gapAtBeginningOfThisSubItr<gap || subItrNo>500)
                 converged = true;
+            this.computationTimePerSubItr.add((System.currentTimeMillis()-time));
             if(this.printVerbosityLevel >=2){
-                System.out.println(subItrNo+"\t"+gapAtBeginningOfThisSubItr+"\t"+((System.currentTimeMillis()-time)/1000.0));
+                System.out.println(this.networkName+"\t"+subItrNo+"\t"+gapAtBeginningOfThisSubItr+"\t"+((System.currentTimeMillis()-time)/1000.0));
             }
             subItrNo++;
             
@@ -395,7 +401,7 @@ public abstract class Network {
             //demand not loaded yet
             return 1.0;
         }
-        if(getSPTT()- prevTSTT >1e-8){
+        if(getSPTT()- prevTSTT >1e-4){
             System.out.println("SPTT="+getSPTT()+" while TSTT="+prevTSTT+" causing negative gap. Exiting!");
             System.exit(1);
         }

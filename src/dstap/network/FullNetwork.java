@@ -61,6 +61,10 @@ public class FullNetwork extends Network{
     public void copyMasterNet(MasterNetwork masterNet){
         Link ll;
         for (Link l : masterNet.links){
+            if(l==null || !nodesByID.containsKey(l.getSource().getId()) || !nodesByID.containsKey(l.getSource().getId())){
+                System.out.println("Something is null while copying master network. Debug");
+                System.exit(1);
+            }
             boundaryLinks.add(ll = new Link(nodesByID.get(l.getSource().getId()), 
                     nodesByID.get(l.getDest().getId()), l.getFFTime(), l.getCoef(),
                     l.getPower(), l.getCapacity(), networkName));

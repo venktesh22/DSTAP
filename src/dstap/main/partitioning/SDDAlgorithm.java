@@ -19,43 +19,309 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
+import org.jblas.DoubleMatrix;
 
 /**
  * Code that generates network partitions using the SDDA algorithm
  * @author vpandey
  */
-public class SDDAlgorithm {
-    private int noOfClusters;
-    private String netName;
-    private SDDANetwork network;
-    
+public class SDDAlgorithm extends PartitioningAlgo{
     private List<Node> sourceNodes;
     private Map<Node, Map<Node, Double>> nodeDistanceFrmSourceNodes;
-    private Map<Node, Set<Node>> clusterAssociation;
-    private Map<Node,Integer> associatedClusterLabel;
-    private Set<Node> boundaryNodes;
-    private boolean addODPairLinks = false; //if true, it adds a link between every OD pair with demand
+    protected Map<Node, Set<Node>> clusterAssociation;
     
-    private String partitionOutputFolderName; //folder name inside INPUTS where partitions are created
+    private List<Integer> sourceNodeIds;
+    private Map<Integer, Map<Integer, Integer>> nodeDistanceFrmSourceNodeIds;
+    protected Map<Integer, Set<Integer>> clusterAssociationIds;
+    
+    private boolean addODPairLinks = false; //if true, it adds a link between every OD pair with demand
 
     public SDDAlgorithm(int noOfClusters, String netName) {
-        this.noOfClusters = noOfClusters;
-        this.netName = netName;
-        network = new SDDANetwork();
-        
+        super(noOfClusters,netName);
         sourceNodes = new ArrayList<>();
         nodeDistanceFrmSourceNodes = new HashMap<>();
         clusterAssociation = new HashMap<>();
-        associatedClusterLabel = new HashMap<>();
-        boundaryNodes = new HashSet<>();
+        
+        sourceNodeIds = new ArrayList<>();
+        nodeDistanceFrmSourceNodeIds = new HashMap<>();
+        clusterAssociationIds = new HashMap<>();
     }
     
-    public void readAndPrepareNetworkFiles() throws FileNotFoundException{
-        network.readBarGeraLinkInput(netName);
-        network.readBarGeraODFile(netName);
+    /**
+     * This algorithm works with Integer IDs of nodes alone
+     */
+    public void runAlgorithm(){
+        //Step-1 create an undirected graph
+        UndirectedNetwork undirectedNet=  this.network.convertToUndirected();
+        
+        //Step-2 determine the rank of each node and find its first source node
+        int firstSourceNode= undirectedNet.getLowestDegreeNodeId();
+        sourceNodeIds.add(firstSourceNode);
+        System.out.println("The first source node is: "+sourceNodeIds.get(0));
+        
+        //Determine remaining source nodes
+        for(int clusterNo=0;clusterNo<noOfClusters;clusterNo++){
+            int latestSourceNodeId = sourceNodeIds.get(clusterNo);
+            updateDistanceFromSourceNodeId(undirectedNet, latestSourceNodeId);
+//            printNodeDistance();
+            
+            int maxDistance=0;
+            List<Integer> maxDistanceNodes= new ArrayList<>();
+            for(Integer nId: nodeDistanceFrmSourceNodeIds.keySet()){
+                if(!sourceNodeIds.contains(nId)){
+                    int totalDist=0;
+                    for(Integer sNodeIdForN: nodeDistanceFrmSourceNodeIds.get(nId).keySet()){
+                        totalDist+= nodeDistanceFrmSourceNodeIds.get(nId).get(sNodeIdForN);
+                    }
+//                    System.out.println("Distance of node: "+n+"\t is: "+totalDist);
+                    if(totalDist>maxDistance && totalDist<Integer.MAX_VALUE && totalDist>0){
+                        maxDistance=totalDist;
+//                        System.out.println("Highest distance node: "+nextSourceNode+"\t with dist: "+totalDist);
+                    }
+                }
+            }
+            for(Integer nId: nodeDistanceFrmSourceNodeIds.keySet()){
+                int totalDist=0;
+                for(Integer sNodeIdForN: nodeDistanceFrmSourceNodeIds.get(nId).keySet())
+                    totalDist+= nodeDistanceFrmSourceNodeIds.get(nId).get(sNodeIdForN);
+                if(totalDist==maxDistance)
+                    maxDistanceNodes.add(nId);
+            }
+            
+            int nextSourceNodeId= -1;
+            
+            //if more than one node which are at the same maximum distance, choose the one with lowest minimum range
+            if(maxDistanceNodes.size()>1){
+                double minRange=Double.MAX_VALUE;
+                int nodeIdWithMinRange= -1;
+                for(Integer nId: maxDistanceNodes){
+//                    int n= network.getNodesByID().get(ids);
+                    double range=0;
+                    for(int i=0;i< sourceNodeIds.size();i++){
+                        for(int j=i+1;j<sourceNodeIds.size();j++){
+                            double diff= Math.abs( nodeDistanceFrmSourceNodeIds.get(nId).get(sourceNodeIds.get(i))- nodeDistanceFrmSourceNodeIds.get(nId).get(sourceNodeIds.get(j)));
+                            range+= diff;
+                        }
+                    }
+                    if(range<minRange){
+                        minRange=range;
+                        nodeIdWithMinRange= nId;
+                    }
+                }
+                nextSourceNodeId= nodeIdWithMinRange;
+            }
+            else{
+                nextSourceNodeId= maxDistanceNodes.get(0);
+            }
+            if(nextSourceNodeId==-1){
+                System.out.println("Next Source node is null");
+                System.exit(1);
+            }
+            
+            //brute force method to ensure that last source node is not added
+            if(clusterNo== noOfClusters-1){
+                break;
+            }
+            sourceNodeIds.add(nextSourceNodeId);
+            System.out.println("The next source node is: "+nextSourceNodeId);
+        }
+        
+        //================================================//
+        //==================Step 5 Partition==============//
+        //================================================//
+        
+        System.out.println("Printing the shortest-hop distance from source nodes to all nodes");
+        for(Integer i: nodeDistanceFrmSourceNodeIds.keySet()){
+            System.out.println("Node "+i+" has distances as "+ nodeDistanceFrmSourceNodeIds.get(i));
+        }
+        
+        ///5(A) create custom maps
+        Map<Integer, Map<Integer, Integer>> nodeDistFromSNodesBySNodeIds = new HashMap<>();
+        for(Integer sId: sourceNodeIds){
+            Map<Integer, Integer> temp = new HashMap<>();
+            for(Integer nodeId: nodeDistanceFrmSourceNodeIds.keySet()){
+                temp.put(nodeId, nodeDistanceFrmSourceNodeIds.get(nodeId).get(sId));
+            }
+            nodeDistFromSNodesBySNodeIds.put(sId, temp);
+        }
+        
+        Map<Integer, Integer> nodeRange = new HashMap<>();
+        for(Integer nodeId: nodeDistanceFrmSourceNodeIds.keySet()){
+            int range=0;
+            for(int i=0;i< sourceNodeIds.size();i++){
+                for(int j=i+1;j<sourceNodeIds.size();j++){
+                    int diff= Math.abs( nodeDistanceFrmSourceNodeIds.get(nodeId).get(sourceNodeIds.get(i))- nodeDistanceFrmSourceNodeIds.get(nodeId).get(sourceNodeIds.get(j)));
+                    range+= diff;
+                }
+            }
+            nodeRange.put(nodeId, range);
+        }
+        //5(B) A while loop that runs until all nodes are assigned
+        int clusterIndex=0;
+        for(Integer sId: sourceNodeIds){
+            associatedClusterLabel.put(network.getNodesByID().get(sId), clusterIndex++);
+        }
+        while(associatedClusterLabel.keySet().size()!= network.getNodes().size()){
+            int sourceNodeClusterIndex=-1;
+            System.out.println("associatedClusterLabel.keySet().size()="+associatedClusterLabel.keySet().size()+" and network.getNodes().size()="+network.getNodes().size());
+            for(Integer sourceNodeId: sourceNodeIds){
+                int nodeIdToBeAssignedToThisSNode = -1;
+                sourceNodeClusterIndex++;
+                
+                //5(C) find node with minimum label
+                int minLabel=10000;
+                List<Integer> allMinLabelNodeIds = new ArrayList<>();
+                for(Integer nodeId: nodeDistFromSNodesBySNodeIds.get(sourceNodeId).keySet()){
+                    //check if this node is already labeled. If not, check its candidacy for minimum label node
+                    if(!associatedClusterLabel.containsKey(network.getNodesByID().get(nodeId))){
+                        if(nodeDistFromSNodesBySNodeIds.get(sourceNodeId).get(nodeId) < minLabel){
+                            minLabel = nodeDistFromSNodesBySNodeIds.get(sourceNodeId).get(nodeId);
+                        }
+                    }
+                    else{
+                        continue;
+                    }
+                }
+                for(Integer nId: nodeDistFromSNodesBySNodeIds.get(sourceNodeId).keySet()){
+                    if(!associatedClusterLabel.containsKey(network.getNodesByID().get(nId))){
+                        if(nodeDistFromSNodesBySNodeIds.get(sourceNodeId).get(nId) == minLabel){
+                            allMinLabelNodeIds.add(nId);
+                        }
+                    }
+                }
+                
+                if(allMinLabelNodeIds.size()>1){
+                    
+                    //5(D) Tie-braker 1: find the node with min rank
+                    int minRank=100000;
+                    List<Integer> allMinRankNodeIds = new ArrayList<>();
+                    for(Integer nodeId: allMinLabelNodeIds){
+                        if(!associatedClusterLabel.containsKey(network.getNodesByID().get(nodeId))){
+                            if(undirectedNet.getNodesById().get(nodeId).getLinks().size()< minRank){
+                                minRank = undirectedNet.getNodesById().get(nodeId).getLinks().size();
+                            }
+                        }
+                    }
+                    for(Integer nodeId: allMinLabelNodeIds){
+                        if(!associatedClusterLabel.containsKey(network.getNodesByID().get(nodeId))){
+                            if(undirectedNet.getNodesById().get(nodeId).getLinks().size()== minRank){
+                                allMinRankNodeIds.add(nodeId);
+                            }
+                        }
+                    }
+                    if(allMinRankNodeIds.size()>1){
+                        
+                        //5(E) Tie breaker 2: find the node with highest range and if there are multiple of those, choose one randomly
+                        int maxRange = -10000;
+                        for(Integer nodeId: allMinRankNodeIds){
+                            if(!associatedClusterLabel.containsKey(network.getNodesByID().get(nodeId))){
+                                if(nodeRange.get(nodeId)> maxRange){
+                                    nodeIdToBeAssignedToThisSNode = nodeId;
+                                    maxRange= nodeRange.get(nodeId);
+                                }
+                            }
+                        }
+                    }
+                    else if(allMinRankNodeIds.size()==1){
+                        nodeIdToBeAssignedToThisSNode = allMinRankNodeIds.get(0);
+                    }
+                    else{
+//                        System.out.println("No node found.");
+//                        System.exit(1);
+                          continue;
+                    }
+                }
+                else if(allMinLabelNodeIds.size()==1){
+                    nodeIdToBeAssignedToThisSNode = allMinLabelNodeIds.get(0);
+                }
+                else{
+//                    System.out.println("No node found");
+//                    System.exit(1);
+                      continue;
+                }
+                
+                //5(F) check if connecting this node will make a continuous graph
+                //@to-do: maybe recheck with the original network based on the link directions to make this decision... or else we end up having unconnected directed graphs
+                boolean thisNodeIsSafeToBeConnected = false;
+                for(UndirectedNode n: undirectedNet.getNodesById().get(nodeIdToBeAssignedToThisSNode).getConnectedNodes()){
+                    if(associatedClusterLabel.containsKey((network.getNodesByID().get(n.getId())))){
+                        if(associatedClusterLabel.get(network.getNodesByID().get(n.getId())) == sourceNodeClusterIndex){
+                            thisNodeIsSafeToBeConnected = true;
+                            break;
+                        }
+                    }
+                }
+                if(!thisNodeIsSafeToBeConnected){
+                    System.out.println("Node "+nodeIdToBeAssignedToThisSNode+" found not safe to be connected");
+                    continue;
+                }
+                
+                associatedClusterLabel.put(network.getNodesByID().get(nodeIdToBeAssignedToThisSNode), sourceNodeClusterIndex);
+//                System.out.println("Adding node"+nodeIdToBeAssignedToThisSNode+" to cluster "+sourceNodeClusterIndex);
+                
+            }
+            System.out.println("");
+        }
+        //--------------------Step-6 Identify boundary nodes--------------------
+        findBoundaryNodes();
+        
+        //----------------------Step-7 Reordering nodes---------------------------
+        
+        addClusterLabelToCentroids();
+        System.out.println("Ended");
     }
     
-    public void runSDDAalgorithm(){
+    private void updateDistanceFromSourceNodeId(UndirectedNetwork net, int sNodeId){
+        for(UndirectedNode n: net.getNodes())
+            n.label=Integer.MAX_VALUE;
+        
+        List<Integer> scanEligibleList = new ArrayList<>();
+        Set<Integer> labeledNodes = new HashSet<>();
+        
+        scanEligibleList.add(sNodeId);
+        labeledNodes.add(sNodeId);
+        net.getNodesById().get(sNodeId).label=0;
+        
+        while(!scanEligibleList.isEmpty()){
+            int currentNode= scanEligibleList.get(0);
+            scanEligibleList.remove(0);
+            
+//            List<Link> allLinksToFromNode = new ArrayList(network.getNodesByID().get(currentNode).getOutgoing());
+//            allLinksToFromNode.addAll(network.getNodesByID().get(currentNode).getIncoming());
+            
+            for(UndirectedLink l: net.getNodesById().get(currentNode).getLinks()){
+//            for(Link l: nodesByID.get(currentNode).getOutgoing()){
+                int downNode= -1;
+                for(UndirectedNode n: l.allNodes){
+                    if(currentNode!= n.getId())
+                        downNode= n.getId();
+                }
+                if(!labeledNodes.contains(downNode)){
+                    labeledNodes.add(downNode);
+                    if(net.getNodesById().get(downNode).label > net.getNodesById().get(currentNode).label+1)
+                        net.getNodesById().get(downNode).label = net.getNodesById().get(currentNode).label+1;
+                    //not tracking the previous node
+                    scanEligibleList.add(downNode);
+                }
+            }
+        }
+        
+        //initialize the nodeDistanceFromSourceNodes
+        for(UndirectedNode n: net.getNodes()){
+            if(nodeDistanceFrmSourceNodeIds.containsKey(n.getId())){
+                Map<Integer, Integer> temp = nodeDistanceFrmSourceNodeIds.get(n.getId());
+                temp.put(sNodeId, n.label);
+                nodeDistanceFrmSourceNodeIds.put(n.getId(), temp);
+            }
+            else{
+                Map<Integer, Integer> temp = new HashMap<>();
+                temp.put(sNodeId, n.label);
+                nodeDistanceFrmSourceNodeIds.put(n.getId(), temp);
+            }
+        }
+    }
+    
+    public void runAlgorithm_old(){
         //Step-1 Initialize
         
         //Step-2 Determine the rank of each node
@@ -172,17 +438,11 @@ public class SDDAlgorithm {
         printClusterAssociation();
         
         //--------------------Step-6 Identify boundary nodes--------------------
-        for(Link l: network.getLinks()){
-            if(associatedClusterLabel.get(l.getDest())!=associatedClusterLabel.get(l.getSource())){
-                boundaryNodes.add(l.getDest());
-                boundaryNodes.add(l.getSource());
-            }
-        }
-        System.out.println(boundaryNodes);
-        System.out.println("No. of boundary nodes after the partition: "+boundaryNodes.size());
+        findBoundaryNodes();
         
         //----------------------Step-7 Reordering nodes---------------------------
         
+        addClusterLabelToCentroids();
         
     }
     
@@ -192,7 +452,6 @@ public class SDDAlgorithm {
      * @param sourceNode 
      */
     private void updateDistanceFromSourceNode(Node sourceNode){
-               
         for(Node n: network.getNodes())
             n.label=Integer.MAX_VALUE;
         
@@ -244,7 +503,6 @@ public class SDDAlgorithm {
                 nodeDistanceFrmSourceNodes.put(n, temp);
             }
         }
-        
     }
     
     private void printNodeDistance(){
@@ -299,97 +557,6 @@ public class SDDAlgorithm {
         return uniqueClusterID.size();
     }
     
-    public void generateNetworkFileOutput(String netName, int numCluster) throws FileNotFoundException{
-//        PrintWriter fileOut1 = new PrintWriter(new FileOutputStream(new File("Networks/"+netName +"/DSTAPfiles/"+"regionalLinks.txt"), false /* append = true */));
-        PrintWriter fileOut1 = new PrintWriter(new FileOutputStream(new File(this.partitionOutputFolderName+"/regionalLinks.txt"), false /* append = true */));
-        
-        List<PrintWriter> fileOut_list = new ArrayList<>();
-        for(int i=0;i<numCluster;i++)
-           fileOut_list.add(new PrintWriter(new FileOutputStream(new File(this.partitionOutputFolderName+"/subnet_"+i+"_net.txt"), false /* append = true */)));
-        
-        fileOut1.println("source\tdest\tfft\tcoef\tpower\tcapacity");
-        for(PrintWriter p: fileOut_list)
-            p.println("source\tdest\tfft\tcoef\tpower\tcapacity");
-        
-        for(Link l:network.getLinks()){
-            if(associatedClusterLabel.get(l.getSource())==associatedClusterLabel.get(l.getDest())){
-                fileOut_list.get(associatedClusterLabel.get(l.getSource())).println(l.getSource().getId()+"\t"+l.getDest().getId()+"\t"+l.getFFTime()+"\t"+l.getCoef()+"\t"+l.getPower()+"\t"+l.getCapacity());
-            }
-            else{
-                fileOut1.println(l.getSource().getId()+"\t"+l.getDest().getId()+"\t"+l.getFFTime()+"\t"+l.getCoef()+"\t"+l.getPower()+"\t"+l.getCapacity());
-            }
-        }
-        fileOut1.close();
-        for(PrintWriter p: fileOut_list)
-            p.close();
-    }
-    
-    public void generateODTripsOutput(String netName, int numCluster) throws FileNotFoundException{
-        List<PrintWriter> fileOut_InTrips_list = new ArrayList<>();
-        List<PrintWriter> fileOut_OutTrips_list = new ArrayList<>();
-        for(int i=0;i<numCluster;i++){
-           fileOut_InTrips_list.add(new PrintWriter(new FileOutputStream(new File(this.partitionOutputFolderName+"/subnet_"+i+"In_trips.txt"), false /* append = true */)));
-           fileOut_OutTrips_list.add(new PrintWriter(new FileOutputStream(new File(this.partitionOutputFolderName+"/subnet_"+i+"Out_trips.txt"), false /* append = true */)));
-        }
-        
-        for(PrintWriter p: fileOut_InTrips_list)
-            p.println("\n");
-        for(PrintWriter p: fileOut_OutTrips_list)
-            p.println("\n");
-        
-        for(Integer origin: network.odDemand.keySet()){
-            int originSubNetID = associatedClusterLabel.get(network.getNodesByID().get(origin));
-            boolean flag_InTrips= true;
-            boolean flag_OutTrips=true;
-            
-            for(Integer dest: network.odDemand.get(origin).keySet()){
-                int destSubNetID = associatedClusterLabel.get(network.getNodesByID().get(dest));
-                if(originSubNetID==destSubNetID){
-                    if(flag_InTrips){
-                        fileOut_InTrips_list.get(originSubNetID).println("Origin\t"+origin);
-                        flag_InTrips=false;
-                    }
-                    fileOut_InTrips_list.get(originSubNetID).print("\t"+dest+" :\t"+network.odDemand.get(origin).get(dest)+";");
-                }
-                else{
-                    if(flag_OutTrips){
-                        fileOut_OutTrips_list.get(originSubNetID).println("Origin\t"+origin);
-                        flag_OutTrips=false;
-                    }
-                    fileOut_OutTrips_list.get(originSubNetID).print("\t"+dest+" :\t"+network.odDemand.get(origin).get(dest)+";");
-                }
-            }
-            fileOut_InTrips_list.get(originSubNetID).println("\n");
-            fileOut_OutTrips_list.get(originSubNetID).println("\n");
-        }
-        
-        for(PrintWriter p: fileOut_InTrips_list)
-            p.close();
-        for(PrintWriter p: fileOut_OutTrips_list)
-            p.close();
-    }
-    
-    public String generateSubNetNames(String netName, int numCluster) throws FileNotFoundException{
-        String epoch= Integer.toString((int)(System.currentTimeMillis()/1000.0));
-        epoch = "SDDA_"+epoch;
-        File dir = new File("Networks/"+netName+"/Inputs/"+epoch);
-    
-        // attempt to create the directory here
-        boolean successful = dir.mkdir();
-        if (!successful){
-            System.out.println("failed trying to create the directory");
-        }
-        this.partitionOutputFolderName= "Networks/"+netName+"/Inputs/"+epoch;
-        
-        PrintWriter fileOut = new PrintWriter(new FileOutputStream(new File(this.partitionOutputFolderName+"/subnetNames.txt"), false /* append = true */));
-        for(int i=0;i<numCluster;i++){
-           fileOut.println("subnet_"+i);
-        }
-        fileOut.close();
-        
-        return epoch;
-    }
-    
     public void writeLinkCoordinateFile(String netName) throws FileNotFoundException{
         Map<Integer, List<Double>> nodeXYCoordinate = new HashMap<>();
         Scanner filein = new Scanner(new File("Networks/"+netName+"/"+netName+ "_node.txt"));
@@ -420,5 +587,19 @@ public class SDDAlgorithm {
         }
         fileOut.flush();
         fileOut.close();
+    }
+    
+    @Override
+    protected void setOutputFolderName(){
+        String epoch= Integer.toString((int)(System.currentTimeMillis()/1000.0));
+        epoch = "SDDA_"+epoch;
+        File dir = new File("Networks/"+netName+"/Inputs/"+epoch);
+    
+        // attempt to create the directory here
+        boolean successful = dir.mkdir();
+        if (!successful){
+            System.out.println("failed trying to create the directory");
+        }
+        this.partitionOutputFolderName= "Networks/"+netName+"/Inputs/"+epoch;
     }
 }

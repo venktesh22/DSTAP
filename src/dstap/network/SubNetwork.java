@@ -528,7 +528,8 @@ public class SubNetwork extends Network {
     //--methods for doing bush-based sensitivity---//
     //=============================================//
     public void updateArtificialLinks(boolean costFunc, double gap){
-        System.out.println("Updating artificial link parameters");
+        if(this.printVerbosityLevel>=1)
+            System.out.println("Updating artificial link parameters");
         for (Node origin : this.tripTable.getArtificialODPairs().keySet()){
             boolean shortestPathExists = false;
             for(Node dest: this.tripTable.getArtificialODPairs().get(origin).keySet()){
@@ -645,6 +646,78 @@ public class SubNetwork extends Network {
         for (Path p : stem.getPathSet()){
             p.setSensitivityFlow((double)1/stem.getPathSet().size());
             p.updatePathSensitivityCost();/* updates the path cost as sum of dt_ij/dx_ij * dx_ij/dX */
+        }
+    }
+    
+    /**
+     * This function starts from a node and searches in both forward and backward directions
+     * It connects the node to all nodes not connected in forward search
+     * It then connects all nodes not connected in the backward search to the node
+     * 
+     * The algorithm does not guarantee than artificial links created will be minimum
+     * as that depends on the choice of the first node. Only strong connectivity is guaranteed
+     */
+    public void makeSubnetStronglyConnected(){
+        //===select one node
+        Integer firstNodeID = null;
+        for(Integer nId: this.nodesByID.keySet()){
+            firstNodeID= nId;
+            break;
+        }
+        
+        Set<Integer> nodesForwardConnectedToFirstNode = new HashSet<>();
+        nodesForwardConnectedToFirstNode.add(firstNodeID);
+        //Breadth first search in forward direction
+        List<Integer> scanEligibleList = new ArrayList<>();
+        scanEligibleList.add(firstNodeID);
+        while(!scanEligibleList.isEmpty()){
+            int nodeId = scanEligibleList.get(0);
+            scanEligibleList.remove(0);
+            for(Link l: this.nodesByID.get(nodeId).getOutgoing()){
+                int toNodeId = l.getDest().getId();
+                if(!nodesForwardConnectedToFirstNode.contains(toNodeId)){
+                    nodesForwardConnectedToFirstNode.add(toNodeId);
+                    scanEligibleList.add(toNodeId);
+                }
+            }
+        }
+        
+        Set<Integer> nodesBackwardConnectedToFirstNode = new HashSet<>();
+        nodesBackwardConnectedToFirstNode.add(firstNodeID);
+        //Breadth first search in forward direction
+        scanEligibleList = new ArrayList<>();
+        scanEligibleList.add(firstNodeID);
+        while(!scanEligibleList.isEmpty()){
+            int nodeId = scanEligibleList.get(0);
+            scanEligibleList.remove(0);
+            for(Link l: this.nodesByID.get(nodeId).getIncoming()){
+                int fromNodeId = l.getSource().getId();
+                if(!nodesBackwardConnectedToFirstNode.contains(fromNodeId)){
+                    nodesBackwardConnectedToFirstNode.add(fromNodeId);
+                    scanEligibleList.add(fromNodeId);
+                }
+            }
+        }
+        
+        //add artificial link to all nodes not connected in forward direction
+        for(Integer nId: this.nodesByID.keySet()){
+            Node n= this.nodesByID.get(nId);
+            if(!nodesForwardConnectedToFirstNode.contains(n.getId())){
+                Node sourceNode = this.nodesByID.get(firstNodeID);
+                Node destNode = n;
+                Link l=new Link(sourceNode, destNode, 10000000, 1.0, 1.0, 1.0, networkName);
+                System.out.println(" Creating artificial link ("+firstNodeID+"-->"+n.getId()+") in network "+networkName +" for ensuring full connectivity");
+                links.add(l);
+                physicalLinks.add(l);//adding to physical links so we can have an equivalent link in the full network as well...
+            }
+            if(!nodesBackwardConnectedToFirstNode.contains(n.getId())){
+                Node sourceNode = n;
+                Node destNode = this.nodesByID.get(firstNodeID);
+                Link l=new Link(sourceNode, destNode, 10000000, 1.0, 1.0, 1.0, networkName);
+                System.out.println(" Creating artificial link ("+n.getId()+"-->"+firstNodeID+") in network "+networkName +" for ensuring full connectivity");
+                links.add(l);
+                physicalLinks.add(l);
+            }
         }
     }
 

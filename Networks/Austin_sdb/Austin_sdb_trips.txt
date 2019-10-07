@@ -1,5 +1,6 @@
 <NUMBER OF ZONES> 1117
-<TOTAL OD FLOW>
+<TOTAL OD FLOW(including intrazone)>	695013
+<TOTAL OD FLOW(excluding intrazone)>	675140
 <END OF METADATA>
 
 Origin  1

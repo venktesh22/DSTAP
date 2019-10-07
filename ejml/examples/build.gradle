@@ -1,0 +1,13 @@
+dependencies {
+    compile project(':main:ejml-all')
+
+    ['core','generator-annprocess'].each { String a->
+        compile('org.openjdk.jmh:jmh-'+a+':1.19')
+    }
+}
+
+idea {
+    module {
+        name = "EJML Examples"
+    }
+}

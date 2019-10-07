@@ -191,6 +191,14 @@ public class CompleteNetwork extends Network {
                 fileOut.println((i++)+"\t"+d);
             fileOut.flush();
             fileOut.close();
+            
+            fileOut = new PrintWriter(new File(folderName+"CompleteNetwork_CompTime.txt"));
+            fileOut.println("IterationNo\tsolveNetTime (ms)");
+            i=0;
+            for(Double d: this.computationTimePerSubItr)
+                fileOut.println((i++)+"\t"+d);
+            fileOut.flush();
+            fileOut.close();
         }
         catch(IOException e){
             e.printStackTrace();

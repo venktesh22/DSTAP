@@ -1,0 +1,11 @@
+Cluster	No of nodes	No of Links
+0	21	60
+1	15	40
+
+No of regional links=20
+No of boundary nodes=11
+Interflow=118035.24552499999
+
+
+Demand Matrix from one subnet to other(including internal demand):
+[40000.000000, 20000.000000; 0.000000, 0.000000]

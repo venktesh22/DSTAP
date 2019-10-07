@@ -174,7 +174,9 @@ public class MasterNetwork extends Network{
         for(ArtificialLink l: this.artificialLinks){
             l.getAssociatedODPair().updateDemandDueToALink(l.getFlow());
         }
-        System.out.println("Done");
+        if(this.printVerbosityLevel >= 1.0){
+            System.out.println("Done");
+        }
     }
     
     public void printMasterNetworkStatistics(){

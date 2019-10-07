@@ -5,12 +5,17 @@
  */
 package dstap.main;
 
+import dstap.main.partitioning.CustomAlgo;
 import dstap.main.partitioning.SDDAlgorithm;
+import dstap.main.partitioning.SpectralAlgo;
 import dstap.network.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
+import org.jblas.DoubleMatrix;
+import Jama.Matrix;
+import org.ejml.simple.SimpleMatrix;
 
 /**
  *
@@ -33,6 +38,7 @@ public class Main {
           
          * 
          */
+               
         String whichAlgorithm = args[0];
         whichAlgorithm = whichAlgorithm.toLowerCase();
         String netName = args[1];
@@ -45,21 +51,52 @@ public class Main {
                     case "sdda":
                         SDDAlgorithm algo = new SDDAlgorithm(noOfClusters, netName);
                         algo.readAndPrepareNetworkFiles();
-                        algo.runSDDAalgorithm();
+                        algo.runAlgorithm();
+                        
                         algo.generateSubNetNames(netName, noOfClusters);
                         algo.generateNetworkFileOutput(netName, noOfClusters);
                         algo.generateODTripsOutput(netName, noOfClusters);
+                        algo.generatePartitionOutput();
+                        algo.printPartitionStats();
+                        break;
+                    case "spectral":
+                        System.out.println("\n\n=====================");
+                        System.out.println("Note that current implementation of Spectral in Java is limited by the"
+                                + "available heap space on the machine as it requires multiple n by n matrices where n is the number of nodes."
+                                + ".\nEven the most efficient Java Matrix implementation fail to work with Networks like Austin/Texas. Use the"
+                                + "python file instead.");
+                        System.out.println("==================\n\n");
+                        SpectralAlgo algo2 = new SpectralAlgo(noOfClusters, netName);
+                        algo2.readAndPrepareNetworkFiles();
+                        algo2.runAlgorithm();
+                        algo2.generateSubNetNames(netName, noOfClusters);
+                        algo2.generateNetworkFileOutput(netName, noOfClusters);
+                        algo2.generateODTripsOutput(netName, noOfClusters);
+                        algo2.generatePartitionOutput();
+                        algo2.printPartitionStats();
+                        break;
+                    case "custom":
+                        String fileName = args[4];
+                        CustomAlgo algo3 = new CustomAlgo(noOfClusters, netName, fileName);
+                        algo3.readAndPrepareNetworkFiles();
+                        algo3.readPartitionFile();
+                        algo3.generateSubNetNames(netName, noOfClusters);
+                        algo3.generateNetworkFileOutput(netName, noOfClusters);
+                        algo3.generateODTripsOutput(netName, noOfClusters);
+                        algo3.generatePartitionOutput();
+                        algo3.printPartitionStats();
                         break;
                     default:
                         System.out.println("For now only SDDA algorithm is supported. Ensure that the 3rd argument is SDDA only. Exiting");
                         System.exit(1);
                 }
+                
                 break;
             case "dstap_heuristic":
                 String folderName = "Networks/"+netName+"/";
                 String subFolderName=args[2]; //subfolder inside INPUTS that contains the partition files...
                 String printVerbosityLevel = args[3]; //LEAST, LOW, MEDIUM, HIGH
-                Boolean runSubnetsInParallel = Boolean.getBoolean(args[4]); //or false
+                Boolean runSubnetsInParallel = Boolean.parseBoolean(args[4]); //or false
                 DSTAPHeuristic optimizer = new DSTAPHeuristic(printVerbosityLevel, 
                 runSubnetsInParallel);
         

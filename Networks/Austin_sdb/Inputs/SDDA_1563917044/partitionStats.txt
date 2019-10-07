@@ -1,0 +1,13 @@
+Cluster	No of nodes	No of Links
+0	3797	9219
+1	3707	9183
+
+No of regional links=297
+No of boundary nodes=272
+Interflow=417058.13132574555
+
+
+Demand Matrix from one subnet to other(including internal demand):
+[311803.000000, 79914.000000; 95621.000000, 187802.000000]
+Number of dropped nodes=3
+Number of dropped links=4

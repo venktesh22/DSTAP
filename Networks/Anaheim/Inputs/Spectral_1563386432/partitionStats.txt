@@ -1,0 +1,10 @@
+Cluster	No of nodes	No of Links
+0	415	910
+1	1	0
+
+No of regional links=4
+No of boundary nodes=3
+
+
+Demand Matrix from one subnet to other(including internal demand):
+[104694.400000, 0.000000; 0.000000, 0.000000]

@@ -1,0 +1,9 @@
+initialMasterGap	0.001
+intialMasterODGap	0.1
+initialMasterGapRate	0.1
+initialSubNetGap	0.001
+intialSubNetODGap	0.1
+intialSubNetGapRate	0.1
+desiredFullNetGap	1E-5
+maxIterations	200
+demandFactor	1.5

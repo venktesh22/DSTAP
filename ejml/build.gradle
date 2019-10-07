@@ -1,0 +1,258 @@
+plugins {
+    id "com.peterabeles.gversion" version "1.4.1"
+}
+
+gversion {
+    srcDir = "main/ejml-core/src"
+    classPackage = "org.ejml"
+    className = "EjmlVersion"
+}
+
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+
+    group = 'org.ejml'
+    version = '0.38'
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'osgi'
+    apply plugin: 'maven'
+    apply plugin: 'signing'
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    // Enable incremental compile. Should make single file changes faster
+    tasks.withType(JavaCompile) {
+        options.incremental = true
+    }
+
+    test {
+        ignoreFailures true
+        reports.html.enabled = false
+    }
+
+    repositories {
+        mavenCentral()
+        mavenLocal()
+
+        maven {
+            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDir 'src'
+            }
+            resources {
+                srcDir 'resources/src'
+            }
+        }
+
+        generate {
+            java {
+                srcDir 'generate'
+            }
+            compileClasspath += sourceSets.main.runtimeClasspath
+        }
+
+        benchmark {
+            java {
+                srcDir 'benchmarks/src'
+            }
+            resources {
+                srcDir 'benchmark/resources'
+            }
+            compileClasspath += sourceSets.main.runtimeClasspath
+        }
+
+        test {
+            java {
+                srcDir 'test'
+                srcDir 'benchmarks/test'
+            }
+            resources {
+                srcDir 'resources/test'
+            }
+            compileClasspath += sourceSets.benchmark.runtimeClasspath
+        }
+    }
+
+    dependencies {
+        compile 'com.google.code.findbugs:jsr305:3.0.2' // @Nullable
+
+        testCompile group: 'junit', name: 'junit', version: '4.12'
+
+        ['core','generator-annprocess'].each { String a->
+            benchmarkCompile('org.openjdk.jmh:jmh-'+a+':1.19')
+        }
+        generateCompile project(':main:autocode')
+    }
+
+    jar {
+        manifest { // the manifest of the default jar is of type OsgiManifest
+            instruction 'Bundle-Vendor', 'EJML'
+//            instruction 'Bundle-Description', 'EJML'
+            instruction 'Bundle-DocURL', 'http://ejml.org/'
+        }
+    }
+
+    javadoc.failOnError = false
+    task javadocJar(type: Jar) {
+        classifier = 'javadoc'
+        from javadoc
+    }
+
+    task sourcesJar(type: Jar) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+
+    artifacts {
+        archives sourcesJar
+//        archives javadocJar // uncomment for release
+    }
+
+    // if Maven central isn't setup in gradle.properties skip all of this
+    if( project.hasProperty('ossrhUsername') ) {
+        signing {
+            sign configurations.archives
+        }
+
+        uploadArchives {
+            repositories {
+                mavenDeployer {
+                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+                    repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                        authentication(userName: ossrhUsername, password: ossrhPassword)
+                    }
+
+                    snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                        authentication(userName: ossrhUsername, password: ossrhPassword)
+                    }
+
+                    pom.project {
+                        name 'EJML'
+                        packaging 'pom'
+                        // optionally artifactId can be defined here
+                        description 'A fast and easy to use dense and sparse matrix linear algebra library written in Java.'
+                        url 'http://ejml.org/'
+
+                        scm {
+                            connection 'git@github.com:lessthanoptimal/ejml.git'
+                            developerConnection 'git@github.com:lessthanoptimal/ejml.git'
+                            url 'https://github.com/lessthanoptimal/ejml'
+                        }
+
+                        licenses {
+                            license {
+                                name 'The Apache Software License, Version 2.0'
+                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                            }
+                        }
+
+                        developers {
+                            developer {
+                                id 'pabeles'
+                                name 'Peter Abeles'
+                                email 'peter.abeles@gmail.com'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def allModules = [
+        ':main:ejml-core',
+        ':main:ejml-ddense',
+        ':main:ejml-dsparse',
+        ':main:ejml-fdense',
+        ':main:ejml-zdense',
+        ':main:ejml-cdense',
+        ':main:ejml-simple',
+        ':main:ejml-experimental',
+]
+
+// Creates a directory with all the comiled jars
+task createLibraryDirectory( dependsOn: allModules.collect{ it+":jar"}+allModules.collect{ it+":sourcesJar"}) {
+
+    doLast {
+        // Create lists of .class jars and source jars
+        ext.listJars = files(allModules.collect{ project(it).tasks.jar.archivePath })
+        ext.listSource = files(allModules.collect{ project(it).tasks.sourcesJar.archivePath })
+
+        file('libraries').deleteDir()
+        file('libraries').mkdir()
+
+        copy {
+            from ext.listJars
+            from ext.listSource
+            into 'libraries'
+        }
+    }
+}
+
+def javadocProjects = [
+        ':main:ejml-core',
+        ':main:ejml-ddense',
+        ':main:ejml-dsparse',
+        ':main:ejml-fdense',
+        ':main:ejml-zdense',
+        ':main:ejml-cdense',
+        ':main:ejml-simple'
+]
+task alljavadoc(type: Javadoc) {
+    // only include source code in src directory to avoid including 3rd party code which some projects do as a hack
+    source = javadocProjects.collect { project(it).fileTree('src').include('**/*.java') }
+//    source = javadocProjects.collect { project(it).sourceSets.main.allJava }
+    classpath = files(javadocProjects.collect { project(it).sourceSets.main.compileClasspath })
+
+    destinationDir = file("${buildDir}/docs/javadoc")
+
+    // Hack for Java 8u121 and beyond. Comment out if running an earlier version of Java
+    options.addBooleanOption("-allow-script-in-comments", true)
+    configure(options) {
+        failOnError = false
+        docTitle = "Efficient Java Matrix Library (EJML) v$project.version"
+        links = [ 'http://docs.oracle.com/javase/8/docs/api/' ]
+        bottom = file('docs/bottom.txt').text
+    }
+}
+
+task oneJarBin(type: Jar, dependsOn: javadocProjects.collect { it + ":compileJava" }) {
+    baseName = 'EJML'
+
+    from files(javadocProjects.collect { project(it).sourceSets.main.output })
+}
+
+task wrapper(type: Wrapper) {
+    distributionType = Wrapper.DistributionType.BIN
+    gradleVersion = '4.10.2'
+}
+
+project(':main:ejml-core').compileJava.dependsOn(createVersionFile)
+
+// Disable the creation of jars for distribution.  If you don't do this it will crash
+[':main',':examples',':main:autocode'].each {String a ->
+    project(a) {
+        if( project.hasProperty('ossrhUsername') ) {
+            signArchives.enabled = false
+        }
+        sourcesJar.enabled = false
+        javadocJar.enabled = false
+        jar.enabled = false
+        uploadArchives.enabled = false
+        install.enabled = false
+    }
+}
+
+

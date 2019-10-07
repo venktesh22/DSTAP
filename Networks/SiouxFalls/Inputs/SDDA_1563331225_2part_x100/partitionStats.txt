@@ -1,0 +1,9 @@
+Cluster	No of nodes	No of Links
+0	10	22
+1	14	40
+
+No of regional links=14
+
+
+Demand Matrix:
+[39100.000000, 69300.000000; 69500.000000, 182700.000000]

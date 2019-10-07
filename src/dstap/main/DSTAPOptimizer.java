@@ -14,7 +14,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,6 +59,9 @@ public abstract class DSTAPOptimizer {
 
     public DSTAPOptimizer(String printVerbosityLevel, Boolean runSubnetsInParallel) {
         switch(printVerbosityLevel){
+            case "NONE":
+                this.printVerbosityLevel=0;
+                break;
             case "LEAST":
                 this.printVerbosityLevel = 1;
                 break;
@@ -209,6 +214,9 @@ public abstract class DSTAPOptimizer {
         for(SubNetwork s:subNets){
             s.readOutTrips(folderName+s.networkName+"Out_Trips.txt", this.DEMAND_FACTOR);
         }
+        for(SubNetwork s: subNets){
+            s.makeSubnetStronglyConnected();
+        }
         if(this.printVerbosityLevel>=1){
             System.out.println("All network input files read");
         }
@@ -276,7 +284,7 @@ public abstract class DSTAPOptimizer {
     
     public void runOptimizer() throws InterruptedException{
         System.out.println("================\n====Solving DSTAP=====\n===============");
-        boolean artificialLinksConstantTT = false; //if true, then sensivity analysis is not performed
+//        boolean artificialLinksConstantTT = false; //if true, then sensivity analysis is not performed
         //(below) tracks if the optimizer has converged. Convergence criteria can be multi-faceted
         boolean hasConverged = false;
         
@@ -285,21 +293,37 @@ public abstract class DSTAPOptimizer {
         //@todo for now ignoring the changes in rate based on new and old fullNetworkGap
         
         int itrNo = 0;
+        Map<Integer, List<Double>> timeEveryIteration = new HashMap<>();
         
         while(!hasConverged){
             System.out.println("\n------------Starting Iteration No. "+itrNo+"---------------\n");
+            List<Double> timeThisIteration = new ArrayList<>();
+            
             masterGap = masterGapRate * masterGap;
             masterODGap = Math.max(masterODGap*masterGap, 0.001);
+            if(masterGap <1E-8)
+                masterGap=1E-8;
+            if(masterODGap < 1E-8)
+                masterODGap = 1E-8;
 
 //            System.out.println("\n--Solving Master network in iteration: "+itrNo +" to a gap of "+masterGap);
+            double startT= System.currentTimeMillis();
             masterNet.solver(masterGap, masterODGap, itrNo);
+            timeThisIteration.add((System.currentTimeMillis()-startT));
             
             //function for updating subnetwork demand using masterNet artificial link flows
+            startT= System.currentTimeMillis();
             masterNet.updateSubnetODsDemand();
+            timeThisIteration.add((System.currentTimeMillis()-startT));
             
             //function for solving each subnetwork in parallel
             subNetGap = subNetGapRate * subNetGap;
             subNetODGap = Math.max(subNetODGap*subNetGapRate, 0.001);
+            if(subNetGap <1E-8)
+                subNetGap=1E-8;
+            if(subNetODGap < 1E-8)
+                subNetODGap = 1E-8;
+            
             if(this.runSubnetsInParallel){
                 double startTimeSubnetEval = System.currentTimeMillis();
                 //got the information for parallelization from http://www.vogella.com/tutorials/JavaConcurrency/article.html
@@ -309,28 +333,39 @@ public abstract class DSTAPOptimizer {
                     executor.execute(worker);
                 }
                 executor.shutdown();
-                executor.awaitTermination(5, TimeUnit.MINUTES); //wait for an UPPERLIMIT of 5 min when one subnet finishes and other is still running. 
-                System.out.println("All threads finished");
-                System.out.println("Time to solve the subnetworks: "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
-
+                executor.awaitTermination(100, TimeUnit.MINUTES); //wait for an UPPERLIMIT of 5 min when one subnet finishes and other is still running. 
+                if(this.printVerbosityLevel>=1){
+                    System.out.println("All threads finished");
+                    System.out.println("Time to solve the subnetworks: "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
+                }
+                timeThisIteration.add((System.currentTimeMillis()-startTimeSubnetEval));
             }
             else{
+                startT=System.currentTimeMillis();
                 for (SubNetwork subNet : subNets){
                     double startTimeSubnetEval = System.currentTimeMillis();
                     subNet.solver(subNetGap, subNetODGap, itrNo);
                     subNet.updateArtificialLinks(false, 1E-5);
                     System.out.println("Time to solve the subnetwork "+ subNet.networkName+": "+ (System.currentTimeMillis()-startTimeSubnetEval) + " milliseconds");
                 }
+                timeThisIteration.add((System.currentTimeMillis()-startT));
             }
-            System.out.println("\n\nMapping flow to full net");
-            double startTForMappingFlows= System.currentTimeMillis();
+            if(this.printVerbosityLevel>=1)
+                System.out.println("\n\nMapping flow to full net");
+            startT= System.currentTimeMillis();
             fullNet.mapDSTAPnetFlowToFullNet();
-            System.out.println("Time to map DSTAP flows to master and subnets:"+(System.currentTimeMillis()-startTForMappingFlows) + " milliseconds");
+            timeThisIteration.add((System.currentTimeMillis()-startT));
+            
+            if(this.printVerbosityLevel>=2)
+                System.out.println("Time to map DSTAP flows to master and subnets:"+(System.currentTimeMillis()-startT) + " milliseconds");
+            
+            startT= System.currentTimeMillis();
             double fullNetGap = fullNet.getFullNetGapAndUpdateExcessCosts();
+            timeThisIteration.add((System.currentTimeMillis()-startT));
             
             
-            System.out.println("\n\n=======Actual gap on full net is " + fullNetGap+"======\n");
-            
+            System.out.println("=======Actual gap on full net is " + fullNetGap+"======\n\n");
+            timeEveryIteration.put(itrNo, timeThisIteration);
             //
             itrNo++;
             if(fullNetGap< this.DESIRED_FULLNET_GAP || itrNo > this.MAX_OUTER_ITERATIONS)
@@ -338,8 +373,10 @@ public abstract class DSTAPOptimizer {
 //            if(itrNo>30)
 //                hasConverged = true; //for debug phase. Remove after code is done
         }
+        
         if(writeOutputFiles){
             this.printExcessCostsAndGaps();
+            this.printComputationTime(timeEveryIteration);
             try{
             fullNet.printFull_LinkFlows(outputFolderName);
             fullNet.printFull_TTs(outputFolderName);
@@ -347,6 +384,24 @@ public abstract class DSTAPOptimizer {
                 e.printStackTrace();
                 return;
             }
+        }
+    }
+    
+    private void printComputationTime(Map<Integer, List<Double>> timeEveryItr){
+        try{
+            PrintWriter fileOut = new PrintWriter(new File(this.outputFolderName+"computationTime.txt"));
+            fileOut.println("iteration\tsolveMasterNet(ms)\tupdateSubDemand(ms)\tsolveSubNets(ms)\tmapFlow(ms)\tgetGapFullNet(ms)");
+            for(Integer i: timeEveryItr.keySet()){
+                fileOut.print(i);
+                for(Double d: timeEveryItr.get(i))
+                    fileOut.print("\t"+d);
+                fileOut.print("\n");
+            }
+            fileOut.flush();
+            fileOut.close();
+        }catch(IOException e){
+            e.printStackTrace();
+            return;
         }
     }
     
